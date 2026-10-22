@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PermissionRequest": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r 'select(.tool_name != \"AskUserQuestion\") | \"- \\(now|strftime(\"%Y-%m-%d\")) | \\(.tool_name)(\\(.tool_input.command // .tool_input.file_path // \"?\")) | fix: | pending\"' >> \"$CLAUDE_PROJECT_DIR/{{kit.memory_root}}/friction/project-prompt-log.md\" || true"
+          }
+        ]
+      }
+    ]
+  }
+}
