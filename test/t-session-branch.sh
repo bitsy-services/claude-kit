@@ -132,6 +132,10 @@ Bash(gh*)|FORBID Bash(gh*) in permissions.allow covers Bash(gh *) (core): broad 
 Bash(git -C *)|FORBID Bash(git -C *) in permissions.allow (core): git -C <dir> runs any git subcommand, so it pre-approves pushing, deleting branches and rewriting history
 Bash(git -C * push *)|FORBID Bash(git -C * push *) in permissions.allow covers Bash(git -C *) (core): git -C <dir> runs any git subcommand, so it pre-approves pushing, deleting branches and rewriting history
 Bash(git p*)|FORBID Bash(git p*) in permissions.allow covers Bash(git push *) (session-branch): a push must prompt, since that prompt confirms anything leaving this clone, a deploy included
+Bash( git push *)|FORBID Bash( git push *) in permissions.allow covers Bash(git push *) (session-branch): a push must prompt, since that prompt confirms anything leaving this clone, a deploy included
+Bash(git  push *)|FORBID Bash(git  push *) in permissions.allow covers Bash(git push *) (session-branch): a push must prompt, since that prompt confirms anything leaving this clone, a deploy included
+Bash(git push * )|FORBID Bash(git push * ) in permissions.allow covers Bash(git push *) (session-branch): a push must prompt, since that prompt confirms anything leaving this clone, a deploy included
+Bash(git :*)|FORBID Bash(git :*) in permissions.allow covers Bash(git *) (core): broad git pre-approves deleting branches, rewriting history and pushing
 EOF
   # Narrow entries, and entries of other tools, are not forbidden.
   jq '.permissions.allow += ["Bash(git push origin topic)", "Bash(npm run build)", "Bash(ghq *)", "Bash(git pushd *)", "WebFetch(domain:gh)"]' \
@@ -211,6 +215,17 @@ t_context_kit_off_pin() {
   git -C "$vendor" checkout -q "$pin"
 }
 
+# Only the kit checkout is left out of the count: a staged bump of another
+# submodule (gyrealm's theme) is uncommitted work.
+t_context_other_submodule() {
+  local pin
+  pin="$(git -C "$CON/.claude/vendor/kit" rev-parse HEAD)"
+  git -C "$CON" update-index --add --cacheinfo "160000,$pin,themes/x"
+  context "$CON"
+  like "$CTX" "tree 1 uncommitted path\(s\)\." "submodule: a staged gitlink outside the kit is uncommitted work"
+  git -C "$CON" rm -q --cached themes/x
+}
+
 # M5: the hook's git status takes no optional lock, so it never rewrites the
 # index under a session that is using it.
 t_context_no_index_write() {
@@ -266,5 +281,6 @@ t_context_trunk_missing
 t_context_without_jq
 t_texts
 t_context_kit_off_pin
+t_context_other_submodule
 t_context_no_index_write
 done_testing

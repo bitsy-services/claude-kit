@@ -92,4 +92,11 @@ feature|allow|git status
 main|allow|git switch feature && git commit -m x
 main|DENY|git checkout feature -- a.txt && git commit -m x
 main|DENY|git switch no-such-branch && git commit -m x
+main|DENY|git checkout -p feature && git commit -am x
+main|DENY|git checkout --patch feature && git commit -m x
+main|DENY|git checkout --pathspec-from-file=f feature && git commit -m x
+main|DENY|git switch feature || git commit -m x
+main|DENY|git switch feature; git commit -m x
+main|DENY|git switch feature | cat && git commit -m x
+main|DENY|git switch feature & git commit -m x
 feature|DENY|git switch feature && git switch main && git commit -m x

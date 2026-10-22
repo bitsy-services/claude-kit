@@ -18,9 +18,10 @@ git rev-parse --is-inside-work-tree > /dev/null 2>&1 || exit 0
 branch=$(git branch --show-current 2> /dev/null)
 [ -z "$branch" ] && branch="(detached HEAD)"
 
-# The tree without the kit checkout, and without optional locks, so the hook
-# never rewrites the index under a running session.
-dirty=$(git --no-optional-locks status --porcelain --ignore-submodules=all 2> /dev/null | wc -l | tr -d ' ')
+# The tree without the kit checkout (other submodules still count), and
+# without optional locks, so the hook never rewrites the index under a
+# running session.
+dirty=$(git --no-optional-locks status --porcelain -- ':(top)' ':(top,exclude).claude/vendor/kit' 2> /dev/null | wc -l | tr -d ' ')
 # The kit pin: one staged but not committed is uncommitted work. A checkout
 # at another commit than the staged pin, as a branch switch leaves it, is not
 # work; it is named on its own, with its fix.

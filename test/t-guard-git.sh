@@ -144,6 +144,10 @@ t_push_unpublished() {
   is "$GOT" DENY "push: origin/main behind the pin is denied"
   is "$REASON" "kit pin $pin7 on topic is not on the kit's origin/main as of the last fetch: publish the kit first, or run kit check --published" \
     "push: the reason names the pin and the ref"
+  # The quotes are stripped, so the cd reaches a directory that does not
+  # exist; the guard then judges the session project.
+  verdict "$CON" "cd \"$CON\" && git push -u origin topic"
+  is "$GOT" DENY "push: a cd to the project's quoted path with a space is judged"
   verdict "$CON" "git push"
   is "$GOT" DENY "push: a bare git push is denied"
   verdict "$CON" "git status && git push upstream topic"
@@ -217,6 +221,9 @@ t_push_refs() {
   is "$GOT" allow "refs: main's published pin may be pushed"
   verdict "$R" "git push"
   is "$GOT" allow "refs: a bare push of main may be pushed"
+  # A directory the guard cannot resolve falls back to the session project.
+  verdict "$R" "cd \"\$CLAUDE_PROJECT_DIR\" && git push origin preview-x"
+  is "$GOT" DENY "refs: a cd to an unexpanded variable falls back to the session project"
 
   # Stage the unpublished pin on main: the session project now fails the
   # index check, which an unrelated repo's push must not inherit.

@@ -36,7 +36,8 @@ abspath() { local d=$2; case "$d" in '~'|'~/'*) d=$HOME${d:1} ;; '$HOME'|'$HOME/
 # that are on the kit's origin/main as of the last fetch, so every clone can fetch
 # them. Any git push counts, to any remote. The repo judged is the one pushed: the
 # toplevel of its directory (cd, git -C), or the session project when --git-dir,
-# --work-tree, GIT_DIR or GIT_WORK_TREE point git elsewhere. The pin is read from
+# --work-tree, GIT_DIR or GIT_WORK_TREE point git elsewhere, or when the directory
+# does not resolve (an unexpanded variable, a quoted path with a space). The pin is read from
 # each pushed ref as <src>:.claude/vendor/kit (the current branch when no refspec
 # is given; every branch for --all), and from the gitlink staged in the index when
 # a source does not resolve or git was pointed elsewhere.
@@ -44,7 +45,7 @@ check_push() {
   local top vendor mode="" ipin="" rest x src pin k
   local -a srcs=() pins=() from=()
   if [ "$alt" = 1 ]; then top=$root
-  else top=$(git -C "$repo" rev-parse --show-toplevel 2>/dev/null) || return 0; fi
+  else top=$(git -C "$repo" rev-parse --show-toplevel 2>/dev/null) || top=$root; fi
   [ -e "$top/.claude/kit.lock.json" ] || return 0
   vendor="$top/.claude/vendor/kit"
   read -r mode ipin rest < <(git -C "$top" ls-files -s -- .claude/vendor/kit 2>/dev/null) || true
@@ -86,6 +87,9 @@ check_push() {
 }
 
 cwd=$root; sim_head=""; sim_repo=""
+# A plain switch counts as leaving the trunk only when nothing after it can run
+# once it fails: commands chained by && alone, no ;, ||, |, & or newline.
+plain_sw=1; case "${cmd//&&/}" in *[';|&']*|*$'\n'*) plain_sw=0 ;; esac
 segs=$(printf '%s' "$cmd" | tr -d "\"'\\\\" | sed -E 's/\$\(|`|\(|\)|\{|\}|&&|\|\||;|\||&/\n/g')
 while IFS= read -r seg; do
   read -ra w <<<"$seg"; n=${#w[@]}; [ "$n" -gt 0 ] || continue
@@ -130,7 +134,8 @@ while IFS= read -r seg; do
     switch|checkout)
       if [[ $a =~ \ (-C|-B|--force-create)\  ]]; then for x in "${pos[@]}"; do is_trunk "$x" && deny "'git $sub' resetting '$TRUNK'"; done; fi
       if [[ $a =~ \ (-c|-b|-C|-B|--create|--force-create|--orphan)\  ]]; then sim_head=${pos[0]:-other}; sim_repo=$repo
-      elif [ "${#pos[@]}" = 1 ] && ! is_trunk "${pos[0]}" && [[ ! $a =~ \ (--|-d|--detach)\  ]] &&
+      elif [ "$plain_sw" = 1 ] && [ "${#pos[@]}" = 1 ] && ! is_trunk "${pos[0]}" &&
+           [[ ! $a =~ \ (--|-d|--detach|-p|--patch|--pathspec-from-file(=[^\ ]*)?)\  ]] &&
            git -C "$repo" rev-parse -q --verify "refs/heads/${pos[0]}" >/dev/null 2>&1; then
         sim_head=${pos[0]}; sim_repo=$repo          # a plain switch to another local branch, not a path checkout
       else for x in "${pos[@]}"; do is_trunk "$x" && { sim_head=$TRUNK; sim_repo=$repo; }; done; fi ;;

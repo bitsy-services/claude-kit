@@ -186,8 +186,9 @@ check_settings() {
 }
 
 # forbid: no allow entry is a forbidden entry, the same rule spelled another
-# way, or a broader rule. Both sides are normalised first, a trailing ":*)"
-# read as " *)" and bare Bash as Bash(*). An allow entry covers a forbidden
+# way, or a broader rule. Both sides are normalised first: bare Bash read as
+# Bash(*); inside Bash(...), the ends trimmed, a trailing ":*" read as " *",
+# and every run of whitespace read as one space. An allow entry covers a forbidden
 # one when the two are equal, or when both are Bash(...) and the allow
 # entry's text before its first * is a prefix of the forbidden entry's text.
 # Entries of other tools compare exactly. One line per allow entry, naming
@@ -198,7 +199,10 @@ check_forbid() {
     check_problem "$line"
   done < <(jq -r --slurpfile cur "$CHECK_TMP/cur.json" '
       def norm: if . == "Bash" then "Bash(*)"
-                elif test("^Bash\\(.*:\\*\\)$") then .[:-3] + " *)"
+                elif test("^Bash\\(.*\\)$") then
+                  .[5:-1] | gsub("^\\s+|\\s+$"; "")
+                  | (if endswith(":*") then .[:-2] + " *" else . end)
+                  | gsub("\\s+"; " ") | "Bash(\(.))"
                 else . end;
       def inner: if startswith("Bash(") and endswith(")") then .[5:-1] else null end;
       def covers($f):
