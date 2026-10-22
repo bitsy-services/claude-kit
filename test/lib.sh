@@ -26,15 +26,50 @@ mk_kit() {
   KIT_HEAD="$(git -C "$T/kit" rev-parse HEAD)"
 }
 
+# R33: nothing under test/ may carry a name Claude Code loads as
+# instructions, so consumer inputs and fixture trees store .claude as
+# dot-claude and CLAUDE.md as CLAUDE.md.in.
+
+# restore_names <dir>: under <dir>, rename each dot-claude directory to
+# .claude and each CLAUDE.md.in file to CLAUDE.md.
+restore_names() {
+  local p
+  while IFS= read -r -d '' p; do
+    mv "$p" "${p%/*}/.claude"
+  done < <(find "$1" -depth -type d -name dot-claude -print0)
+  while IFS= read -r -d '' p; do
+    mv "$p" "${p%/*}/CLAUDE.md"
+  done < <(find "$1" -type f -name CLAUDE.md.in -print0)
+}
+
+# store_names <dir>: the inverse of restore_names.
+store_names() {
+  local p
+  while IFS= read -r -d '' p; do
+    mv "$p" "${p%/*}/dot-claude"
+  done < <(find "$1" -depth -type d -name .claude -print0)
+  while IFS= read -r -d '' p; do
+    mv "$p" "${p%/*}/CLAUDE.md.in"
+  done < <(find "$1" -type f -name CLAUDE.md -print0)
+}
+
+# mk_consumer <inputs> [dir]: a consumer repo from kit.json, repo.md,
+# settings.json, CLAUDE.md.in and files/ (copied with names restored), with
+# the kit vendored at .claude/vendor/kit.
 mk_consumer() {
-  local in="$1" dir="${2:-$T/con}"
+  local in="$1" dir="${2:-$T/con}" stage
   mkdir -p "$dir/.claude/rules"
   git -C "$dir" init -q -b topic
   cp "$in/kit.json" "$dir/.claude/kit.json"
   cp "$in/repo.md" "$dir/.claude/rules/repo.md"
   cp "$in/settings.json" "$dir/.claude/settings.json"
-  cp "$in/CLAUDE.md" "$dir/CLAUDE.md"
-  if [ -d "$in/files" ]; then cp -R "$in/files/." "$dir/"; fi
+  cp "$in/CLAUDE.md.in" "$dir/CLAUDE.md"
+  if [ -d "$in/files" ]; then
+    stage="$(mktemp -d "$T/stage.XXXXXX")"
+    cp -R "$in/files/." "$stage/"
+    restore_names "$stage"
+    cp -R "$stage/." "$dir/"
+  fi
   git -C "$dir" -c protocol.file.allow=always submodule add -q "file://$T/kit" .claude/vendor/kit
   # R15: .gitmodules records the public https URL; the clone keeps fetching
   # from the local file URL that submodule add wrote to .git/config.

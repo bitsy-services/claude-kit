@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Each test/fixtures/<f>/ renders the real slices into a consumer built from
 # its inputs, passes kit check, and its whole .claude/ (without vendor/, the
-# lock's pin read as "PIN") equals test/fixtures/<f>/expected/.claude.
+# lock's pin read as "PIN") equals test/fixtures/<f>/expected/. expected/
+# holds the tree under its stored names (R33): .claude as dot-claude.
 # KIT_UPDATE_EXPECTED=1 rewrites expected/ from the render instead, and only
 # when render and check both pass.
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -11,8 +12,8 @@ mkdir -p "$T/tmp"
 export TMPDIR="$T/tmp"
 mk_kit "$TEST_ROOT/slices"
 
-# snapshot <out>: $CON/.claude without vendor/ into <out>/.claude, with the
-# lock's pin replaced by "PIN" and nothing else changed.
+# snapshot <out>: $CON/.claude without vendor/ into <out>, with the lock's
+# pin replaced by "PIN" and the names stored as in expected/.
 snapshot() {
   local out="$1" e
   mkdir -p "$out/.claude"
@@ -22,6 +23,7 @@ snapshot() {
     cp -R "$e" "$out/.claude/"
   done
   jq '.pin = "PIN"' "$CON/.claude/kit.lock.json" > "$out/.claude/kit.lock.json"
+  store_names "$out"
 }
 
 # fixture <dir>: render, check and compare one fixture.
@@ -37,19 +39,19 @@ fixture() {
   is "$RC" 0 "$name: kit check exits 0"
   [ "$RC" = 0 ] || { ok=0; printf '%s\n' "$OUT" | sed 's/^/#   /'; }
   snapshot "$got"
-  is "$(grep -rlF '{{kit.' "$got/.claude" || true)" "" "$name: no {{kit. is left"
+  is "$(grep -rlF '{{kit.' "$got" || true)" "" "$name: no {{kit. is left"
 
   if [ "${KIT_UPDATE_EXPECTED:-}" = 1 ]; then
     if [ "$ok" = 1 ]; then
       rm -rf "$fx/expected"
       mkdir -p "$fx/expected"
-      cp -R "$got/.claude" "$fx/expected/.claude"
+      cp -R "$got/." "$fx/expected/"
     fi
     _t_report "$((1 - ok))" "$name: expected/ rewritten"
     return
   fi
-  out="$(diff -r "$fx/expected/.claude" "$got/.claude" 2>&1)" && d=0 || d=$?
-  is "$d" 0 "$name: .claude equals expected/.claude"
+  out="$(diff -r "$fx/expected" "$got" 2>&1)" && d=0 || d=$?
+  is "$d" 0 "$name: .claude equals expected/dot-claude"
   [ "$d" = 0 ] || printf '%s\n' "$out" | sed 's/^/#   /'
 }
 

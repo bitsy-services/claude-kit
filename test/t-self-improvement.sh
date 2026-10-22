@@ -12,7 +12,7 @@ export TMPDIR="$T/tmp"
 # basic's repo.md and settings; CLAUDE.md imports the index under "memory".
 cp "$TEST_ROOT/test/consumers/basic/repo.md" "$TEST_ROOT/test/consumers/basic/settings.json" "$T/in/"
 echo '{"format":1,"slices":["core","self-improvement"],"params":{"gate":"bash scripts/check.sh","memory_root":"memory"},"exclude":[]}' > "$T/in/kit.json"
-echo '@memory/MEMORY.md' > "$T/in/CLAUDE.md"
+echo '@memory/MEMORY.md' > "$T/in/CLAUDE.md.in"
 : > "$T/in/files/memory/MEMORY.md"
 mk_kit "$TEST_ROOT/slices"
 mk_consumer "$T/in"

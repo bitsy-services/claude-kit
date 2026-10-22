@@ -258,6 +258,30 @@ t_skill_description() {
   planted "skill-frontmatter description" 'LINT skill-frontmatter slices/core/skills/kit/SKILL.md: description is missing'
 }
 
+# R33: nothing under test/ may load as instructions in a session that reads
+# it. One line per .claude directory, however many files it holds; the
+# stored names dot-claude and CLAUDE.md.in pass.
+t_instruction_dir() {
+  local x
+  fresh
+  x="$K/test/fixtures/x"
+  mkdir -p "$x/expected/.claude/rules" "$x/files/dot-claude"
+  printf 'rule\n' > "$x/expected/.claude/rules/a.md"
+  printf '{}\n' > "$x/expected/.claude/settings.json"
+  printf 'note\n' > "$x/files/dot-claude/m.md"
+  printf '@m.md\n' > "$x/CLAUDE.md.in"
+  planted "instruction-source dir" \
+    'LINT instruction-source test/fixtures/x/expected/.claude: a .claude directory under test/ can load into a session that reads files here; store it as dot-claude'
+}
+
+t_instruction_file() {
+  fresh
+  mkdir -p "$K/test/consumers/y"
+  printf '@.claude/memory/MEMORY.md\n' > "$K/test/consumers/y/CLAUDE.md"
+  planted "instruction-source file" \
+    'LINT instruction-source test/consumers/y/CLAUDE.md: a CLAUDE.md under test/ can load into a session that reads files here; store it as CLAUDE.md.in'
+}
+
 # selftest counts a failing suite as one problem, after the lints.
 t_suite() {
   fresh
@@ -307,6 +331,8 @@ t_rm_r
 t_rm_delete
 t_skill_name
 t_skill_description
+t_instruction_dir
+t_instruction_file
 t_suite
 t_usage
 done_testing

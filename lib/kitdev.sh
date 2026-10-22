@@ -497,6 +497,34 @@ _lint_rm_r() {
   done < <(_kd_grep E "$_KD_DELETE_RE" "${others[@]}")
 }
 
+# instruction-source (R33): nothing under test/ carries a name Claude Code
+# loads as instructions when a session reads files in that subtree, which in
+# a consumer would leak a fixture's rules and skills from the vendored kit.
+# Fixture and consumer trees store .claude as dot-claude and CLAUDE.md as
+# CLAUDE.md.in, and the tests map the names back. One line per .claude
+# directory.
+_lint_instruction_source() {
+  local f d
+  local -A seen=()
+  for f in "${KD_FILES[@]}"; do
+    case "$f" in test/*) ;; *) continue ;; esac
+    case "/$f" in
+      */.claude/*)
+        d="/$f"
+        d="${d%%/.claude/*}/.claude"
+        d="${d#/}"
+        if [ -z "${seen[$d]+x}" ]; then
+          seen[$d]=1
+          _lint instruction-source "$d" "a .claude directory under test/ can load into a session that reads files here; store it as dot-claude"
+        fi
+        ;;
+    esac
+    if [ "${f##*/}" = CLAUDE.md ]; then
+      _lint instruction-source "$f" "a CLAUDE.md under test/ can load into a session that reads files here; store it as CLAUDE.md.in"
+    fi
+  done
+}
+
 # selftest_lints <kit_root> (R4): run every lint over the kit at <kit_root>.
 # Prints the LINT lines, sets SELFTEST_LINTS to their count and returns it
 # (capped at 255).
@@ -518,6 +546,7 @@ selftest_lints() {
   _lint_param_pattern
   _lint_gitmodules
   _lint_rm_r
+  _lint_instruction_source
   if [ "$SELFTEST_LINTS" -gt 255 ]; then return 255; fi
   return "$SELFTEST_LINTS"
 }
