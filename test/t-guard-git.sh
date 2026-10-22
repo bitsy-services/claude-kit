@@ -41,8 +41,26 @@ verdict() {
 
 t_template() {
   local n
-  n="$(grep -cxF 'TRUNK="${KIT_TRUNK:-{{kit.trunk}}}"' "$SRC" 2> /dev/null)"
-  is "$n" 1 "template: TRUNK comes from KIT_TRUNK, else {{kit.trunk}}"
+  n="$(grep -cxF -e 'TRUNK="{{kit.trunk}}"' -e 'TRUNK="${KIT_TRUNK:-$TRUNK}"' "$SRC" 2> /dev/null)"
+  is "$n" 2 "template: TRUNK comes from KIT_TRUNK, else {{kit.trunk}}"
+}
+
+# The kit's own sessions run the template unrendered with KIT_TRUNK=main
+# (.claude/settings.json), so the trunk must be exactly main.
+t_unrendered() {
+  local R="$T/unrendered" g="$G"
+  mkdir -p "$R"
+  git -C "$R" init -q -b main
+  git -C "$R" commit -q --allow-empty -m init
+  G="$SRC"
+  export KIT_TRUNK=main
+  verdict "$R" "git commit -m x"
+  is "$GOT" DENY "unrendered: a commit on main is denied"
+  like "$REASON" "^Refusing 'git commit' on 'main'\. 'main' moves only" "unrendered: the reason names main"
+  verdict "$R" "git switch -c topic && git commit -m x"
+  is "$GOT" allow "unrendered: a commit on a new topic passes"
+  unset KIT_TRUNK
+  G="$g"
 }
 
 # The battery: the scratch repo of the lab's corpus.sh, no kit lock.
@@ -135,6 +153,7 @@ t_push_unpublished() {
 }
 
 t_template
+t_unrendered
 t_battery
 t_no_jq
 t_push_unpublished

@@ -55,7 +55,7 @@ master_repo() {
 }
 
 t_guard_trunk() {
-  is "$(grep -cF '${KIT_TRUNK:-master}' "$CON/.claude/hooks/kit/guard-git.sh" 2> /dev/null)" 1 \
+  is "$(grep -cxF 'TRUNK="master"' "$CON/.claude/hooks/kit/guard-git.sh" 2> /dev/null)" 1 \
     "guard: the trunk default is master"
 }
 

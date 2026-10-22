@@ -1,0 +1,19 @@
+name: selftest
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+      - name: Set the git identity
+        run: |
+          git config --global user.name kit-ci
+          git config --global user.email kit-ci@localhost
+      - name: Selftest
+        run: bash bin/kit selftest

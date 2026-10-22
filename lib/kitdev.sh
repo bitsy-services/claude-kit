@@ -1,5 +1,6 @@
 # Kit-repo commands. selftest runs the lints over the kit's working tree, then
-# the test suite. Sourced by bin/kit; uses bash, git, jq and POSIX tools (R14).
+# the test suite; publish lands a topic branch on the kit's main and pushes it.
+# Sourced by bin/kit; uses bash, git, jq and POSIX tools (R14).
 #
 # Each lint is a _lint_<name> function that reports one line per problem
 # with _lint: LINT <name> <file>: <detail>. The lints read the kit's files:
@@ -578,4 +579,44 @@ cmd_selftest() {
   fi
   say "selftest: $n problems"
   return 1
+}
+
+# cmd_publish: land the current topic branch on main and push main to
+# origin. It runs on a clean topic branch, after a passing selftest, and a
+# branch that changes slices/ must also change CHANGELOG.md. main moves only
+# by fast-forward; if the push fails, main goes back to where it was and the
+# topic is checked out again, so a retry starts from the same state.
+cmd_publish() {
+  local topic old sha
+  if [ $# -gt 0 ]; then die "usage: kit publish"; fi
+  topic="$(git -C "$KIT_SELF" symbolic-ref --short -q HEAD)" || topic=""
+  if [ -z "$topic" ] || [ "$topic" = main ]; then die "publish: run it on the topic branch"; fi
+  old="$(git -C "$KIT_SELF" rev-parse -q --verify refs/heads/main)" || die "publish: there is no local main branch"
+  if [ -n "$(git -C "$KIT_SELF" status --porcelain)" ]; then
+    say "publish: the tree is dirty; commit the changes on $topic first"
+    return 1
+  fi
+  if ! cmd_selftest; then
+    say "publish: selftest failed"
+    return 1
+  fi
+  if [ -n "$(git -C "$KIT_SELF" diff --name-only main...HEAD -- slices)" ] &&
+    [ -z "$(git -C "$KIT_SELF" diff --name-only main...HEAD -- CHANGELOG.md)" ]; then
+    say "publish: slices changed without a CHANGELOG entry"
+    return 1
+  fi
+  git -C "$KIT_SELF" switch -q main || die "publish: cannot switch to main"
+  if ! git -C "$KIT_SELF" merge -q --ff-only "$topic"; then
+    git -C "$KIT_SELF" switch -q "$topic" || die "publish: cannot switch back to $topic"
+    say "publish: main cannot fast-forward to $topic; bring main into $topic first"
+    return 1
+  fi
+  sha="$(git -C "$KIT_SELF" rev-parse HEAD)"
+  if ! git -C "$KIT_SELF" push -q origin main; then
+    git -C "$KIT_SELF" switch -q "$topic" || die "publish: the push failed, and cannot switch back to $topic"
+    git -C "$KIT_SELF" update-ref refs/heads/main "$old" "$sha" || die "publish: the push failed, and cannot restore main to ${old:0:7}"
+    say "publish: the push failed; main is back at ${old:0:7}"
+    return 1
+  fi
+  say "published ${sha:0:7}"
 }

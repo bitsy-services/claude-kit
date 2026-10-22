@@ -25,6 +25,8 @@ On the session branch, each step its own call:
 
 If this repo's rules leave commits to the user, stop before step 4 and report. Changed rules and skills load only in a new session.
 
+If step 1 stops with `bump: cannot stage the gitlink`, `.gitignore` ignores `.claude/vendor/kit`, most often through an unanchored `vendor/` line: anchor it as `/vendor/` and run the bump again.
+
 ## Change a rendered file
 
 A rendered file carries a stamp naming its source, and the write guard refuses edits to it. The fix belongs in the kit:

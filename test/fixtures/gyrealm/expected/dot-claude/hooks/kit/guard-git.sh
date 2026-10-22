@@ -10,8 +10,11 @@
 # mistakes, not an adversary (python3 -c, variables and scripts are out of reach).
 # Battery: test/guard-git.cases in the kit repo.
 set -u
-# KIT_TRUNK lets the kit's own sessions run this file unrendered.
-TRUNK="${KIT_TRUNK:-main}"
+# KIT_TRUNK lets the kit's own sessions run this file unrendered. Two
+# assignments, because an unrendered default inside ${KIT_TRUNK:-...} would
+# end at its own first closing brace and leave the rest on the value.
+TRUNK="main"
+TRUNK="${KIT_TRUNK:-$TRUNK}"
 refuse() { jq -cn --arg r "$1" \
   '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'; exit 0; }
 deny() { refuse "Refusing $1. '$TRUNK' moves only by fast-forward from a session branch (/merge-to-main), and no branch is ever deleted. Work on a session branch: git switch -c <topic>."; }

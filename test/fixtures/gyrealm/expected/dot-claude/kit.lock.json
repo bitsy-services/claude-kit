@@ -8,7 +8,7 @@
     },
     ".claude/hooks/kit/guard-git.sh": {
       "from": "slices/session-branch/hooks/guard-git.sh",
-      "blob": "96ca1317a9a5defbb342414cf658ea27e09ccda9"
+      "blob": "902eb60e59a3a568b01068e50da60c99c29b3e73"
     },
     ".claude/hooks/kit/guard-write.sh": {
       "from": "slices/core/hooks/guard-write.sh",
@@ -68,7 +68,7 @@
     },
     ".claude/skills/kit/SKILL.md": {
       "from": "slices/core/skills/kit/SKILL.md",
-      "blob": "04cd44d1e5a391df64135112f81cb8cdaa99d059"
+      "blob": "8b0ab3c8ab7cc4d35d8262680cfbf78606f7deae"
     },
     ".claude/skills/merge-to-main/SKILL.md": {
       "from": "slices/session-branch/skills/merge-to-main/SKILL.md",

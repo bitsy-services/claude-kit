@@ -1,0 +1,45 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Edit",
+      "Write",
+      "Bash(bash bin/kit selftest)",
+      "Bash(bash test/run.sh)",
+      "Bash(bash test/t-*)",
+      "Bash(git status *)",
+      "Bash(git log *)",
+      "Bash(git diff *)",
+      "Bash(git show *)",
+      "Bash(git ls-files *)",
+      "Bash(git rev-parse *)",
+      "Bash(git rev-list *)",
+      "Bash(git for-each-ref *)",
+      "Bash(git blame *)",
+      "Bash(git merge-base *)",
+      "Bash(git branch --show-current)",
+      "Bash(git branch --list *)",
+      "Bash(git remote -v)",
+      "Bash(git remote get-url *)",
+      "Bash(git submodule status *)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|NotebookEdit",
+        "hooks": [{"type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/slices/core/hooks/guard-write.sh\""}]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [{"type": "command", "command": "KIT_TRUNK=main bash \"$CLAUDE_PROJECT_DIR/slices/session-branch/hooks/guard-git.sh\""}]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [{"type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/test/stop-hook.sh\"", "timeout": 600}]
+      }
+    ]
+  }
+}
