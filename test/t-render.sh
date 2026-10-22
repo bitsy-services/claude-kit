@@ -56,11 +56,11 @@ x" "basic: a.md is exactly the stamp then the substituted body"
   is "$(jq -r '.files[".claude/rules/kit/a.md"].from' "$r/kit.lock.json")" "slices/core/rules/a.md" "basic: lock names the source"
   is "$(jq -r '.files[".claude/rules/kit/a.md"].blob' "$r/kit.lock.json")" \
     "$(git hash-object -- "$r/rules/kit/a.md")" "basic: lock blob is the rendered file's blob"
-  is "$(jq -c 'keys_unsorted' "$r/kit.lock.json")" '["format","pin","files","excluded"]' "basic: lock keys (R2)"
+  is "$(jq -c 'keys_unsorted' "$r/kit.lock.json")" '["format","pin","files","excluded","settings","set"]' "basic: lock keys"
   is "$(jq -c '.files | keys' "$r/kit.lock.json")" \
     '[".claude/hooks/kit/h.sh",".claude/rules/kit/a.md",".claude/rules/kit/b.md",".claude/skills/s/SKILL.md"]' \
     "basic: lock lists every rendered dest"
-  is "$(exact "$r/settings.json")" "$(exact "$BASIC/settings.json")" "basic: settings.json untouched (R2)"
+  like "$(cat "$r/settings.json")" 'Bash\(echo \*\)' "basic: settings.json carries the kit entries"
 }
 
 t_render_idempotent() {

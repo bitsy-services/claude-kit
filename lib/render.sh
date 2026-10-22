@@ -10,13 +10,15 @@ _RENDER_TEXT_JQ='
 def at($i; $s): .[:$i] + [$s] + .[$i:];
 $p[0] as $v
 | gsub("\\{\\{kit\\.(?<n>[A-Za-z0-9_]+)\\}\\}"; $v[.n])
-| split("\n")
+| if $kind == "json" then . else
+  split("\n")
 | if $kind == "sh" then
     at(if (.[0] | startswith("#!")) then 1 else 0 end; "# " + $stamp)
   elif .[0] == "---" and (.[1:] | index("---")) != null then
     at((.[1:] | index("---")) + 2; $stamp)
   else at(0; $stamp) end
 | join("\n")
+  end
 '
 
 # Names used as {{kit.<name>}} that the resolved params do not carry.
@@ -44,7 +46,7 @@ _RENDER_LOCK_JQ='
 # carries, print one RENDER line per name and return 1.
 render_text() {
   local src="$1" slice="$2" rel="$3" params="$4" kind=md bad n
-  case "$rel" in *.sh) kind=sh ;; esac
+  case "$rel" in *.sh) kind=sh ;; *.json) kind=json ;; esac
   bad="$(jq -Rrs --slurpfile p "$params" "$_RENDER_REFS_JQ" "$src")" || return 2
   if [ -n "$bad" ]; then
     while IFS= read -r n; do
@@ -60,7 +62,8 @@ render_text() {
 # render_expected <outdir>: render the pin into <outdir>:
 #   files/<dest>     each rendered destination that is not excluded
 #   excluded/<dest>  each excluded destination, rendered only for its blob
-#   lock.json        {format, pin, files, excluded}
+#   lock.json        {format, pin, files, excluded, settings, set}
+#   settings.json    the consumer's .claude/settings.json after the merge
 # plus working files (tree/, config.json, params.json, index.tsv).
 # Needs ctx_consumer. Prints CONFIG or RENDER lines and returns 1 on problems.
 render_expected() {
@@ -90,8 +93,59 @@ render_expected() {
       rc=1
     fi
   done < <(jq -r '.paths[] | join("\t")' "$out/config.json")
-  [ "$rc" = 0 ] || return 1
+  render_settings "$out" || rc=$?
+  [ "$rc" = 0 ] || return "$rc"
   jq -Rn --arg pin "$pin" "$_RENDER_LOCK_JQ" < "$out/index.tsv" > "$out/lock.json" || return 2
+  jq --slurpfile m "$out/merged.json" '. + {settings: $m[0].lockSettings, set: $m[0].set}' \
+    "$out/lock.json" > "$out/lock.new" || return 2
+  mv -- "$out/lock.new" "$out/lock.json" || return 2
+}
+
+# render_settings <outdir>: substitute and parse each enabled slice's
+# settings.json, then merge them three-way into the consumer's settings.
+# Writes <outdir>/merged.json and <outdir>/settings.json. Prints RENDER lines
+# and returns 1 for a fragment that is not valid JSON.
+render_settings() {
+  local out="$1" slice frag cur lock rc=0 r
+  : > "$out/frags.jsonl"
+  while IFS= read -r slice; do
+    frag="$out/tree/slices/$slice/settings.json"
+    [ -f "$frag" ] || continue
+    if render_text "$frag" "$slice" settings.json "$out/params.json" > "$out/frag.txt"; then
+      if jq -ce 'select(type == "object")' "$out/frag.txt" > "$out/frag.one" 2> /dev/null && [ -s "$out/frag.one" ]; then
+        cat "$out/frag.one" >> "$out/frags.jsonl"
+      else
+        say "RENDER slices/$slice/settings.json is not valid JSON"
+        rc=1
+      fi
+    else
+      r=$?
+      [ "$r" = 1 ] || return 2
+      cat "$out/frag.txt"
+      rc=1
+    fi
+  done < <(jq -r '.slices[]' "$out/config.json")
+  [ "$rc" = 0 ] || return 1
+  cur="$out/cur.json"
+  lock="$out/oldlock.json"
+  if [ -f "$SETTINGS" ] && jq -e 'type == "object"' "$SETTINGS" > /dev/null 2>&1; then
+    cp -- "$SETTINGS" "$cur" || return 2
+  elif [ -e "$SETTINGS" ]; then
+    say "RENDER .claude/settings.json is not a JSON object; fix or remove it"
+    return 1
+  else
+    echo '{}' > "$cur"
+  fi
+  if [ -f "$LOCK" ] && jq -e 'type == "object"' "$LOCK" > /dev/null 2>&1; then
+    cp -- "$LOCK" "$lock" || return 2
+  else
+    echo '{}' > "$lock"
+  fi
+  jq -n --slurpfile frag "$out/frags.jsonl" --slurpfile cur "$cur" --slurpfile lock "$lock" \
+    --argjson exclude "$(jq -c '.exclude' "$out/config.json")" \
+    --argjson set "$(jq -c '.set' "$out/config.json")" \
+    -f "$KIT_SELF/lib/settings.jq" > "$out/merged.json" || return 2
+  jq --indent 2 '.settings' "$out/merged.json" > "$out/settings.json" || return 2
 }
 
 # A lock entry is removable only if it has the shape of a kit destination.
@@ -185,5 +239,8 @@ cmd_render() {
       .claude/skills/*/SKILL.md) rmdir -- "$CON/${d%/SKILL.md}" 2> /dev/null || true ;;
     esac
   done
+  if ! cmp -s -- "$tmp/settings.json" "$SETTINGS"; then
+    cp -- "$tmp/settings.json" "$SETTINGS" || die "render: cannot write .claude/settings.json"
+  fi
   cp -- "$tmp/lock.json" "$LOCK" || die "render: cannot write .claude/kit.lock.json"
 }
