@@ -36,6 +36,11 @@ mk_consumer() {
   cp "$in/CLAUDE.md" "$dir/CLAUDE.md"
   if [ -d "$in/files" ]; then cp -R "$in/files/." "$dir/"; fi
   git -C "$dir" -c protocol.file.allow=always submodule add -q "file://$T/kit" .claude/vendor/kit
+  # R15: .gitmodules records the public https URL; the clone keeps fetching
+  # from the local file URL that submodule add wrote to .git/config.
+  git config -f "$dir/.gitmodules" submodule..claude/vendor/kit.url https://github.com/bitsy-services/claude-kit
+  # R16: what kit init sets in a real consumer clone.
+  git -C "$dir" config push.recurseSubmodules check
   git -C "$dir" add -A
   git -C "$dir" commit -q -m "consumer fixture"
   CON="$dir"

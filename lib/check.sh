@@ -147,10 +147,237 @@ check_lock() {
   check_problem "STALE LOCK .claude/kit.lock.json differs from a fresh render at $CHECK_PIN7: run kit render"
 }
 
+# settings: every kit entry the fresh render carries is in the consumer's
+# settings, compared as flattened lists. The slice of an entry is the first
+# enabled slice whose fragment holds it; hooks are reported without one.
+check_settings() {
+  local s cur="$CHECK_TMP/cur.json" names=() defs line
+  defs="$(sed -n '/^def uniq/,/^def merge/{/^def merge/!p}' "$KIT_SELF/lib/settings.jq")"
+  case "$defs" in *"def flatten"*) ;; *) die "internal error: cannot read flatten from lib/settings.jq" ;; esac
+  if [ -f "$SETTINGS" ] && jq -e 'type == "object"' "$SETTINGS" > /dev/null 2>&1; then
+    cp -- "$SETTINGS" "$cur" || die "internal error: cannot copy settings"
+  else
+    echo '{}' > "$cur"
+  fi
+  while IFS= read -r s; do
+    if [ -f "$CHECK_EXP/tree/slices/$s/settings.json" ]; then names+=("$s"); fi
+  done < <(jq -r '.slices[]' "$CHECK_EXP/config.json")
+  while IFS= read -r line; do
+    check_problem "$line"
+  done < <(jq -nr --slurpfile lock "$CHECK_EXP/lock.json" --slurpfile cur "$cur" \
+      --slurpfile fr "$CHECK_EXP/frags.jsonl" --argjson names "$(jq -nc '$ARGS.positional' --args "${names[@]}")" \
+      "$defs"'
+      ($cur[0] | flatten) as $cf
+      | def owner($k; $x):
+          first(range(0; $names | length) | select(any(($fr[.] | flatten)[$k][]; . == $x)) | $names[.]) // "?";
+      ( ["allow", "ask", "deny"][] as $k
+        | ($lock[0].settings.kit[$k] // [])[] | . as $x
+        | select(any($cf[$k][]; . == $x) | not)
+        | "SETTINGS missing \($k) \($x) (\(owner($k; $x)))" ),
+      ( ($lock[0].settings.kit.hooks // [])[] | . as $h
+        | select(any($cf.hooks[]; . == $h) | not)
+        | "SETTINGS missing hook \(.[0]) \(.[1]) \(.[2].command // (.[2] | tojson))" )')
+}
+
+# forbid: no forbidden entry in the consumer's permissions.allow.
+check_forbid() {
+  local line
+  while IFS= read -r line; do
+    check_problem "$line"
+  done < <(jq -r --slurpfile cur "$CHECK_TMP/cur.json" \
+      '($cur[0].permissions.allow // []) as $a
+       | .forbid[] | select(. as $f | any($a[]; . == $f.entry))
+       | "FORBID \(.entry) in permissions.allow (\(.slice)): \(.reason)"' "$CHECK_EXP/config.json")
+}
+
+# breadth: no allow entry has a wildcard that starts an argument.
+check_breadth() {
+  local e
+  while IFS= read -r e; do
+    check_problem "BREADTH $e"
+  done < <(jq -r '(.permissions.allow // [])[] | strings' "$CHECK_TMP/cur.json" \
+      | grep -E -- '\*[[:space:]]+[^*[:space:])]' || true)
+}
+
+# set: each key a slice sets has that value in the consumer's settings.
+check_set() {
+  local s line
+  : > "$CHECK_TMP/owners.jsonl"
+  while IFS= read -r s; do
+    if [ -f "$CHECK_EXP/tree/slices/$s/slice.json" ]; then
+      jq -c --arg s "$s" '{($s): (.set // {})}' "$CHECK_EXP/tree/slices/$s/slice.json" >> "$CHECK_TMP/owners.jsonl" \
+        || die "internal error: cannot read slices/$s/slice.json"
+    fi
+  done < <(jq -r '.slices[]' "$CHECK_EXP/config.json")
+  while IFS= read -r line; do
+    check_problem "$line"
+  done < <(jq -nr --slurpfile lock "$CHECK_EXP/lock.json" --slurpfile cur "$CHECK_TMP/cur.json" \
+      --slurpfile so "$CHECK_TMP/owners.jsonl" \
+      '$cur[0] as $c | $lock[0].set | to_entries[] | .key as $k | .value as $v
+       | select(($c | has($k) | not) or $c[$k] != $v)
+       | ([ $so[] | to_entries[] | select(.value | has($k)) | .key ] | last) as $s
+       | "SET \($k) is \(if $c | has($k) then $c[$k] | tojson else "unset" end); \($s) sets \($v | tojson)"')
+}
+
+# memory: CLAUDE.md has a line that imports the memory index.
+check_memory() {
+  local root want line
+  root="$(jq -r '.params.memory_root // empty' "$CHECK_EXP/config.json")"
+  if [ -z "$root" ]; then return 0; fi
+  want="@$root/MEMORY.md"
+  if [ -f "$CON/CLAUDE.md" ]; then
+    while IFS= read -r line || [ -n "$line" ]; do
+      line="${line//$'\r'/}"
+      line="${line#"${line%%[![:space:]]*}"}"
+      line="${line%"${line##*[![:space:]]}"}"
+      if [ "$line" = "$want" ]; then return 0; fi
+    done < "$CON/CLAUDE.md"
+  fi
+  check_problem "MEMORY CLAUDE.md does not import $want"
+}
+
+# _check_heading <heading>: print absent, empty or ok for "## <heading>" in
+# repo.md. The body runs to the next heading of level 1 or 2.
+_check_heading() {
+  local line st=absent
+  if [ ! -f "$REPO_MD" ]; then echo absent; return 0; fi
+  while IFS= read -r line || [ -n "$line" ]; do
+    line="${line//$'\r'/}"
+    if [ "$st" = absent ]; then
+      line="${line%"${line##*[![:space:]]}"}"
+      if [ "$line" = "## $1" ]; then st=empty; fi
+    elif [[ $line =~ ^#{1,2}[[:space:]] ]]; then
+      break
+    elif [[ $line =~ [^[:space:]] ]]; then
+      st=ok
+      break
+    fi
+  done < "$REPO_MD"
+  echo "$st"
+}
+
+# repo.md: every heading an enabled slice declares is present and not empty.
+check_repo() {
+  local s h st
+  while IFS=$'\t' read -r s h; do
+    st="$(_check_heading "$h")"
+    case "$st" in
+      absent) check_problem "REPO repo.md lacks ## $h ($s)" ;;
+      empty) check_problem "REPO repo.md ## $h is empty ($s)" ;;
+    esac
+  done < <(jq -r '.headings | to_entries[] | .key as $s | .value[] | "\($s)\t\(.)"' "$CHECK_EXP/config.json")
+}
+
+# _check_links_in <file> <rel>: LINK for each relative link whose target does
+# not exist. Fenced blocks and inline code spans are skipped.
+_check_links_in() {
+  local f="$1" rel="$2" line fence=0 t base
+  local fence_re='^[[:space:]]*(```|~~~)' span_re='^([^`]*)`[^`]*`(.*)$' link_re='\]\(([^)]*)\)(.*)$'
+  local scheme_re='^[A-Za-z][A-Za-z0-9+.-]*:'
+  base="${f%/*}"
+  while IFS= read -r line || [ -n "$line" ]; do
+    line="${line//$'\r'/}"
+    if [[ $line =~ $fence_re ]]; then fence=$((1 - fence)); continue; fi
+    if [ "$fence" = 1 ]; then continue; fi
+    while [[ $line =~ $span_re ]]; do line="${BASH_REMATCH[1]}${BASH_REMATCH[2]}"; done
+    while [[ $line =~ $link_re ]]; do
+      t="${BASH_REMATCH[1]}"
+      line="${BASH_REMATCH[2]}"
+      t="${t#"${t%%[![:space:]]*}"}"
+      t="${t%%[[:space:]]*}"
+      t="${t#<}"
+      t="${t%>}"
+      if [ -z "$t" ] || [[ $t == '#'* ]] || [[ $t =~ $scheme_re ]]; then continue; fi
+      t="${t%%#*}"
+      if [ -z "$t" ]; then continue; fi
+      if [[ $t == /* ]]; then
+        if [ -e "$CON${t//%20/ }" ]; then continue; fi
+      elif [ -e "$base/${t//%20/ }" ]; then
+        continue
+      fi
+      check_problem "LINK $rel -> $t"
+    done
+  done < "$f"
+}
+
+# links: relative links in CLAUDE.md and .claude/**/*.md (not the vendored
+# kit) point at something that exists.
+check_links() {
+  local f
+  if [ -f "$CON/CLAUDE.md" ]; then _check_links_in "$CON/CLAUDE.md" "CLAUDE.md"; fi
+  while IFS= read -r -d '' f; do
+    _check_links_in "$f" "${f#"$CON"/}"
+  done < <(find "$CON/.claude" -path "$CON/.claude/vendor" -prune -o -type f -name '*.md' -print0 2> /dev/null \
+      | LC_ALL=C sort -z)
+}
+
+# dangling: no broken symlink under .claude (not the vendored kit).
+check_dangling() {
+  local f
+  while IFS= read -r -d '' f; do
+    check_problem "DANGLING ${f#"$CON"/}"
+  done < <(find "$CON/.claude" -path "$CON/.claude/vendor" -prune -o -xtype l -print0 2> /dev/null \
+      | LC_ALL=C sort -z)
+}
+
+# eol: a rendered hook has no CRLF line endings.
+check_eol() {
+  local d
+  while IFS= read -r d; do
+    if [ -f "$CON/$d" ] && LC_ALL=C grep -q $'\r' -- "$CON/$d"; then
+      check_problem "EOL $d has CRLF line endings"
+    fi
+  done < <(jq -r '.files | keys[] | select(startswith(".claude/hooks/kit/"))' "$CHECK_EXP/lock.json")
+}
+
+# url: .gitmodules records the vendored kit over https.
+check_url() {
+  local key name url=""
+  if [ -f "$CON/.gitmodules" ]; then
+    key="$(git config -f "$CON/.gitmodules" --get-regexp '^submodule\..*\.path$' '^\.claude/vendor/kit$' | head -n 1 | cut -d' ' -f1)" || key=""
+    if [ -n "$key" ]; then
+      name="${key%.path}"
+      url="$(git config -f "$CON/.gitmodules" --get "$name.url")" || url=""
+    fi
+  fi
+  case "$url" in
+    https://*) ;;
+    *) check_problem "URL .gitmodules records .claude/vendor/kit as ${url:-(nothing)}; use https://" ;;
+  esac
+}
+
+# clone: push.recurseSubmodules is "check" (kit init sets it).
+check_clone() {
+  local v
+  v="$(git -C "$CON" config --get push.recurseSubmodules)" || v=""
+  if [ "$v" != check ]; then
+    if [ "$CHECK_PUBLISHED" = 1 ]; then
+      check_problem "CLONE push.recurseSubmodules is not \"check\": run kit init"
+    else
+      check_notice "push.recurseSubmodules is not \"check\": run kit init"
+    fi
+  fi
+}
+
+# published (--published only): the pin is on the kit's origin/main.
+check_published() {
+  if [ "$CHECK_PUBLISHED" != 1 ]; then return 0; fi
+  if ! GIT_TERMINAL_PROMPT=0 git -C "$VENDOR" fetch -q origin main > /dev/null 2>&1; then
+    check_problem "UNPUBLISHED cannot reach the kit's origin to verify $CHECK_PIN7"
+  elif ! git -C "$VENDOR" merge-base --is-ancestor "$CHECK_PIN" refs/remotes/origin/main 2> /dev/null; then
+    check_problem "UNPUBLISHED $CHECK_PIN7 is not on the kit's origin/main"
+  fi
+}
+
 # cmd_check [--published]: run every row, then print the notices and the
 # summary. Exit 0 when no row found a problem, 1 otherwise.
 cmd_check() {
   local n
+  if ! command -v jq > /dev/null 2>&1; then
+    say "NEED jq"
+    say "kit check: 1 problems"
+    return 1
+  fi
   CHECK_PUBLISHED=0
   while [ $# -gt 0 ]; do
     case "$1" in
@@ -178,7 +405,19 @@ cmd_check() {
     check_stamp
     check_excluded_changed
     check_lock
+    check_settings
+    check_forbid
+    check_breadth
+    check_set
+    check_memory
+    check_repo
   fi
+  check_links
+  check_dangling
+  if [ -n "$CHECK_EXP" ]; then check_eol; fi
+  check_url
+  check_clone
+  check_published
 
   for n in "${CHECK_NOTICES[@]}"; do
     note "$n"
