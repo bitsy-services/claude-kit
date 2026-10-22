@@ -84,6 +84,17 @@ t_no_placeholder_left() {
   is "${left:-none}" none "render: no rendered file contains {{kit."
 }
 
+# /merge-to-main checks publication on the branch, before the fast-forward,
+# so an unpublished pin is not clean and nothing moves (R28).
+t_published_before_landing() {
+  local f="$CON/.claude/skills/merge-to-main/SKILL.md" pub ff
+  pub="$(grep -n 'kit check --published' "$f" 2> /dev/null | head -n 1 | cut -d: -f1)"
+  ff="$(grep -n 'git merge --ff-only B' "$f" 2> /dev/null | head -n 1 | cut -d: -f1)"
+  is "$([ -n "$pub" ] && [ -n "$ff" ] && [ "$pub" -lt "$ff" ] && echo before || echo "published at ${pub:-none}, ff at ${ff:-none}")" \
+    before "merge-to-main: kit check --published comes before the fast-forward"
+  is "$(grep -c 'kit check --published' "$f" 2> /dev/null)" 1 "merge-to-main: kit check --published runs once"
+}
+
 t_check() {
   kit_run check
   is "$RC" 0 "check: kit check exits 0"
@@ -146,6 +157,7 @@ t_guard_trunk
 t_allows
 t_hooks_registered
 t_no_placeholder_left
+t_published_before_landing
 t_check
 t_forbid
 t_repo_lacks_gate
