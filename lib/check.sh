@@ -191,7 +191,7 @@ check_settings() {
 # one when the two are equal, or when both are Bash(...) and the allow
 # entry's text before its first * is a prefix of the forbidden entry's text.
 # Entries of other tools compare exactly. One line per allow entry, naming
-# the first forbidden entry it covers.
+# the forbidden entry it is, else the first one it covers.
 check_forbid() {
   local line
   while IFS= read -r line; do
@@ -211,7 +211,7 @@ check_forbid() {
       | $cur[0].permissions | if type == "object" then .allow else null end
       | if type == "array" then .[] | strings else empty end
       | . as $x
-      | first($fb[] | select(. as $f | $x | covers($f.entry)))
+      | (first($fb[] | select(.entry == $x)) // first($fb[] | select(. as $f | $x | covers($f.entry))))
       | if $x == .entry then "FORBID \(.entry) in permissions.allow (\(.slice)): \(.reason)"
         else "FORBID \($x) in permissions.allow covers \(.entry) (\(.slice)): \(.reason)" end' \
       "$CHECK_EXP/config.json")

@@ -123,6 +123,7 @@ t_forbid_spellings() {
     is "$(printf '%s\n' "$OUT" | grep '^FORBID ')" "$want" "forbid $e: the line"
   done << 'EOF'
 Bash(gh:*)|FORBID Bash(gh:*) in permissions.allow covers Bash(gh *) (core): broad gh can move origin/main without the push prompt
+Bash(git:*)|FORBID Bash(git:*) in permissions.allow (core): the same rule as Bash(git *), which pre-approves deleting branches, rewriting history and pushing
 Bash(git push:*)|FORBID Bash(git push:*) in permissions.allow covers Bash(git push *) (session-branch): a push must prompt, since that prompt confirms anything leaving this clone, a deploy included
 Bash(npm run:*)|FORBID Bash(npm run:*) in permissions.allow covers Bash(npm run *) (core): npm run * pre-approves npm run deploy; allow named scripts instead
 Bash|FORBID Bash in permissions.allow covers Bash(git *) (core): broad git pre-approves deleting branches, rewriting history and pushing
