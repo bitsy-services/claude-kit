@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(hugo)",
+      "Bash(hugo version)",
+      "Bash(hugo env)",
+      "Bash(hugo --minify *)",
+      "Bash(hugo -D *)",
+      "Bash(hugo server *)"
+    ]
+  }
+}

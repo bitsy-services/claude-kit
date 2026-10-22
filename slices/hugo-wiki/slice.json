@@ -1,0 +1,10 @@
+{
+  "requires": ["core"],
+  "params": {
+    "wiki_dir": {"default": "content", "pattern": "^[A-Za-z0-9._/-]+$"}
+  },
+  "forbid": [
+    {"entry": "Bash(hugo *)", "reason": "broad hugo pre-approves hugo deploy, which uploads the built site to a remote target"},
+    {"entry": "Bash(hugo deploy *)", "reason": "hugo deploy uploads the built site to a remote target, so it must prompt"}
+  ]
+}
