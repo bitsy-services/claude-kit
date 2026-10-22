@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # kit publish, in a clone of the toy kit whose origin is a local bare repo.
-# It refuses on main, on a dirty tree, on a red selftest and when slices/
-# changed without a CHANGELOG entry; otherwise it fast-forwards main to the
+# It refuses on main, on a dirty tree, on a red selftest, when slices/, bin/
+# or lib/ changed without a CHANGELOG entry, and when the fast-forward does
+# not leave main at the topic head; otherwise it fast-forwards main to the
 # topic and pushes main to origin. The toy kit has no test/run.sh, so its
 # selftest runs only the lints (R3).
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -73,10 +74,23 @@ t_no_changelog() {
   fresh
   change slices/core/rules/a.md "Changed." "Change a rule"
   publish
-  like "$OUT" '^publish: slices changed without a CHANGELOG entry$' "no entry: refused"
+  like "$OUT" '^publish: slices/, bin/ or lib/ changed without a CHANGELOG entry$' "no entry: refused"
   is "$RC" 1 "no entry: exits 1"
   unmoved "no entry"
   is "$(git -C "$C" branch --show-current)" "topic$N" "no entry: still on the topic"
+}
+
+# M6: the CLI is what a consumer runs too, so bin/ and lib/ need an entry.
+t_no_changelog_code() {
+  local f
+  for f in lib/common.sh bin/kit; do
+    fresh
+    change "$f" "# a note" "Touch $f"
+    publish
+    like "$OUT" '^publish: slices/, bin/ or lib/ changed without a CHANGELOG entry$' "no entry for $f: refused"
+    is "$RC" 1 "no entry for $f: exits 1"
+    unmoved "no entry for $f"
+  done
 }
 
 t_red_selftest() {
@@ -137,6 +151,24 @@ t_diverged() {
   is "$(git -C "$C" branch --show-current)" "$b" "diverged: back on the topic"
 }
 
+# T14.1: local main holds a commit the topic lacks and contains the topic, so
+# the fast-forward is a no-op. main is not the topic head: nothing is pushed.
+t_main_ahead() {
+  local b main1
+  fresh
+  b="topic$N"
+  git -C "$C" switch -q main
+  change README.md "on main, untested" "Move main"
+  main1="$(git -C "$C" rev-parse main)"
+  git -C "$C" switch -q "$b"
+  publish
+  like "$OUT" "^publish: main is at ${main1:0:7}, not at the head of $b" "main ahead: refused"
+  is "$RC" 1 "main ahead: exits 1"
+  is "$(git -C "$C" rev-parse main)" "$main1" "main ahead: main is where it was"
+  is "$(git -C "$T/origin.git" rev-parse main)" "$MAIN0" "main ahead: origin's main is unmoved"
+  is "$(git -C "$C" branch --show-current)" "$b" "main ahead: back on the topic"
+}
+
 # origin's main moved since the clone: the push is rejected, main goes back
 # to where it was, and the topic is checked out again.
 t_push_rejected() {
@@ -162,9 +194,11 @@ t_on_main
 t_detached
 t_dirty
 t_no_changelog
+t_no_changelog_code
 t_red_selftest
 t_published
 t_outside_slices
 t_diverged
+t_main_ahead
 t_push_rejected
 done_testing

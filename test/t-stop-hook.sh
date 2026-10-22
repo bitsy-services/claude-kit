@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # test/stop-hook.sh, the kit repo's own Stop hook, run from a copy whose
-# bin/kit is a stub selftest: it lets a green turn end, blocks a red one with
+# bin/kit is a stub selftest: it runs selftest --lints-only (R35; the full
+# suite gates kit publish and CI), lets a green turn end, blocks a red one with
 # the first 20 lines of the report less the passing tests, and lets a turn
 # end once stop_hook_active is set, with or without jq.
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -37,7 +38,7 @@ t_green() {
   stub 0 0
   hook '{"stop_hook_active":false}'
   is "$RC:$OUT" "0:" "green: the turn ends"
-  is "$(cat "$T/ran" 2> /dev/null)" "selftest|$K" "green: ran selftest from the kit root"
+  is "$(cat "$T/ran" 2> /dev/null)" "selftest --lints-only|$K" "green: ran selftest --lints-only from the kit root (R35)"
 }
 
 t_red() {
@@ -47,7 +48,7 @@ t_red() {
   is "$RC" 0 "red: exits 0"
   is "$(printf '%s' "$OUT" | jq -r .decision)" block "red: blocks the turn"
   reason="$(printf '%s' "$OUT" | jq -r .reason)"
-  is "$(printf '%s\n' "$reason" | head -n 1)" "bash bin/kit selftest failed:" "red: the reason names the command"
+  is "$(printf '%s\n' "$reason" | head -n 1)" "bash bin/kit selftest --lints-only failed:" "red: the reason names the command"
   like "$reason" '^LINT voice slices/x/rules/r1\.md' "red: the LINT line is in the reason"
   like "$reason" '^not ok 26 - it broke$' "red: the failing test is in the reason"
   like "$reason" '^selftest: 2 problems$' "red: the summary is in the reason"

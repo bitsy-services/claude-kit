@@ -232,11 +232,37 @@ t_rm_r() {
   planted rm-r 'LINT rm-r lib/zz.sh: line 2: rm -rf'
 }
 
+# T13.1: the recursive option counts anywhere among the options.
+t_rm_r_later_option() {
+  fresh
+  printf 'x() { rm -f -r "$tmp"; }\n' > "$K/lib/zz.sh"
+  planted "rm-r later -r" 'LINT rm-r lib/zz.sh: line 1: rm -f -r'
+  fresh
+  printf 'x() { rm -v --force --recursive -- "$tmp"; }\n' > "$K/bin/zz"
+  planted "rm-r later --recursive" 'LINT rm-r bin/zz: line 1: rm -v --force --recursive'
+  fresh
+  printf 'x() { rm -f -- "$tmp"; rm -fv "$a" "$b"; }\n' > "$K/lib/zz.sh"
+  selftest
+  is "$LINTS" "" "rm-r: rm without a recursive option passes"
+}
+
 # R10: only lib/common.sh's scratch_cleanup may use find's delete action.
 t_rm_delete() {
   fresh
   printf '# then: find "$d" -delete\n' > "$K/lib/zz.sh"
   planted "rm-r delete" 'LINT rm-r lib/zz.sh: line 1: -delete'
+  # bin/kit sources lib/*.sh, so each planted line sits in a function that
+  # nothing calls.
+  fresh
+  printf 'x() { n="$(find "$d" -delete)"; }\n' > "$K/lib/zz.sh"
+  planted "rm-r delete in a substitution" 'LINT rm-r lib/zz.sh: line 1: -delete'
+  fresh
+  printf 'x() { find "$d" -delete; echo done; }\n' > "$K/lib/zz.sh"
+  planted "rm-r delete before ;" 'LINT rm-r lib/zz.sh: line 1: -delete'
+  fresh
+  printf 'x() {\n  git push origin --delete topic\n  echo -deleted\n}\n' > "$K/lib/zz.sh"
+  selftest
+  is "$LINTS" "" "rm-r delete: --delete and longer words pass"
 }
 
 t_skill_name() {
@@ -299,10 +325,30 @@ t_suite() {
   is "$(printf '%s\n' "$OUT" | tail -n 1)" "selftest: 1 problems" "suite: a failing suite is one problem"
 }
 
+# R35: --lints-only runs the syntax check and the lints, never the suite.
+t_lints_only() {
+  fresh
+  mkdir -p "$K/test"
+  printf 'echo suite ran\nexit 1\n' > "$K/test/run.sh"
+  selftest --lints-only
+  is "$RC" 0 "lints-only: exits 0 when the lints pass"
+  unlike "$OUT" 'suite ran|^TESTS|^NOTICE' "lints-only: the suite does not run"
+  is "$(printf '%s\n' "$OUT" | tail -n 1)" "selftest: ok" "lints-only: ends with selftest: ok"
+  printf 'x() { rm -rf "$tmp"; }\n' > "$K/lib/zz.sh"
+  printf '#!/usr/bin/env bash\nif then\n' > "$K/slices/core/hooks/bad.sh"
+  selftest --lints-only
+  is "$RC" 1 "lints-only: a lint fails it"
+  like "$OUT" '^LINT rm-r lib/zz\.sh' "lints-only: the lint line"
+  like "$OUT" '^LINT syntax slices/core/hooks/bad\.sh' "lints-only: the syntax line"
+  is "$(printf '%s\n' "$OUT" | tail -n 1)" "selftest: 2 problems" "lints-only: counts the lint lines"
+}
+
 t_usage() {
   fresh
   selftest extra
   is "$RC" 2 "usage: an argument exits 2"
+  selftest --lints-only extra
+  is "$RC" 2 "usage: an argument after --lints-only exits 2"
 }
 
 t_clean_copy
@@ -328,11 +374,13 @@ t_param_no_pattern
 t_param_loose_pattern
 t_gitmodules
 t_rm_r
+t_rm_r_later_option
 t_rm_delete
 t_skill_name
 t_skill_description
 t_instruction_dir
 t_instruction_file
 t_suite
+t_lints_only
 t_usage
 done_testing

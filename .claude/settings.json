@@ -5,6 +5,7 @@
       "Edit",
       "Write",
       "Bash(bash bin/kit selftest)",
+      "Bash(bash bin/kit selftest --lints-only)",
       "Bash(bash test/run.sh)",
       "Bash(bash test/t-*)",
       "Bash(git status *)",
@@ -33,6 +34,12 @@
       {
         "matcher": "Bash",
         "hooks": [{"type": "command", "command": "KIT_TRUNK=main bash \"$CLAUDE_PROJECT_DIR/slices/session-branch/hooks/guard-git.sh\""}]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [{"type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/test/session-start.sh\""}]
       }
     ],
     "Stop": [

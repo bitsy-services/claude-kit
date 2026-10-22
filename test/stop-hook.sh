@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # The kit repo's own Stop hook (registered in .claude/settings.json): a turn
-# in a kit session does not end while bash bin/kit selftest is red. The block
+# in a kit session does not end while bash bin/kit selftest --lints-only is
+# red. It runs the syntax check and the lints, which take seconds; the whole
+# selftest, with the test suite, gates kit publish and CI (R35). The block
 # reason is the first 20 lines of selftest's report, passing test lines left
 # out so the failures show. It honours stop_hook_active, so a turn it has
 # blocked once can end and the hook never loops. Without jq it reads the flag
@@ -19,9 +21,9 @@ else
 fi
 if [ "$active" = true ]; then exit 0; fi
 
-if out="$(cd -- "$root" && bash bin/kit selftest 2>&1)"; then exit 0; fi
+if out="$(cd -- "$root" && bash bin/kit selftest --lints-only 2>&1)"; then exit 0; fi
 
-reason="bash bin/kit selftest failed:
+reason="bash bin/kit selftest --lints-only failed:
 $(printf '%s\n' "$out" | grep -v -E '^(ok [0-9]+( |$)|1\.\.[0-9]+$|# t-[A-Za-z0-9_-]+\.sh$)' | head -n 20)"
 
 if command -v jq > /dev/null 2>&1; then

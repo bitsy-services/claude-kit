@@ -1,6 +1,6 @@
 # Changelog
 
-One entry for every change under `slices/` that reaches `main`, newest first. `kit bump` prints the lines added between the old pin and the new one, so each line reads on its own.
+One entry for every change under `slices/`, `bin/` or `lib/` that reaches `main`, newest first. `kit bump` prints the lines added between the old pin and the new one, so each line reads on its own.
 
 An entry starts with `BREAKING:` when the change removes or renames a slice, file or parameter, adds a required parameter or heading, changes a hook's behaviour, or narrows a permission. A `BREAKING:` entry gives the exact edit to `.claude/kit.json` or `.claude/rules/repo.md` that a repo makes at the bump.
 

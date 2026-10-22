@@ -35,7 +35,7 @@ Edit in a standalone clone of the kit, on a topic branch, never on `main`. A ven
 
 ## Changelog
 
-- Every change under `slices/` gets a `CHANGELOG.md` entry on the same branch. `kit publish` refuses a branch that changes `slices/` without one.
+- Every change under `slices/`, `bin/` or `lib/` gets a `CHANGELOG.md` entry on the same branch, since a repo that bumps the kit runs all three. `kit publish` refuses a branch that changes any of them without one.
 - An entry starts with `BREAKING:` when the change removes or renames a slice, file or parameter, adds a required parameter or heading, changes a hook's behaviour, or narrows a permission. It gives the exact `kit.json` or `repo.md` edit that a repo makes at the bump. Prefer additive changes with defaults.
 - A change to a rendered file changes the fixtures. Regenerate them with `KIT_UPDATE_EXPECTED=1 bash test/t-fixtures.sh` and read the diff before committing.
 
@@ -49,6 +49,6 @@ Edit in a standalone clone of the kit, on a topic branch, never on `main`. A ven
 
 ## Check and publish
 
-1. `bash bin/kit selftest` runs the lints and the test suite, and must end `selftest: ok`. The Stop hook in `.claude/settings.json` runs it at the end of each turn and blocks while it is red.
+1. `bash bin/kit selftest` runs the syntax check, the lints and the test suite, and must end `selftest: ok`; it gates `kit publish` and CI. The Stop hook in `.claude/settings.json` runs `bash bin/kit selftest --lints-only` (the syntax check and the lints, which take seconds) at the end of each turn and blocks while it is red, so run the whole selftest before publishing. The SessionStart hook lists the local branches that `origin/main` does not hold as of the last fetch.
 2. Commit on the topic branch.
-3. `bash bin/kit publish` lands the topic on `main` and pushes it. It refuses on `main`, on a dirty tree, on a red selftest, and on a `slices/` change without a CHANGELOG entry; otherwise it fast-forwards `main` to the topic and pushes `main` to `origin`. It is not pre-approved, so it prompts, and that prompt is the review.
+3. `bash bin/kit publish` lands the topic on `main` and pushes it. It refuses on `main`, on a dirty tree, on a red selftest, on a `slices/`, `bin/` or `lib/` change without a CHANGELOG entry, and when the fast-forward leaves `main` anywhere but the topic's head; otherwise it fast-forwards `main` to the topic and pushes `main` to `origin`. It is not pre-approved, so it prompts, and that prompt is the review.

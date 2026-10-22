@@ -22,8 +22,10 @@ declare -gA KD_REQ=() KD_PARAMS=() KD_BAD=() KD_DESTS=() KD_CLOSURE=()
 KD_BUDGET=150
 _KD_VOICE_RE='this kit|downstream|every consumer|consumer repos|our consumers'
 _KD_PUBLIC_RE='/hom[e]/|gi[t]@|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
-_KD_RMR_RE='(^|[^A-Za-z0-9_.-])rm[[:space:]]+(-[a-zA-Z]*[rR][a-zA-Z]*|--recursive)'
-_KD_DELETE_RE='(^|[[:space:]])-delete([[:space:]]|$)'
+# rm with a recursive option anywhere among its options (T13.1).
+_KD_RMR_RE='(^|[^A-Za-z0-9_.-])rm([[:space:]]+(-[a-zA-Z]+|--[a-z][a-z-]*))*[[:space:]]+(-[a-zA-Z]*[rR][a-zA-Z]*|--recursive)'
+# find's delete action, also inside $(...) or before ; (T13.1).
+_KD_DELETE_RE='(^|[[:space:]])-delete([^A-Za-z0-9_-]|$)'
 _KD_PARAM_RE='\{\{kit\.[A-Za-z0-9_]+\}\}'
 
 # A settings fragment holds permissions.allow/ask/deny and hooks, nothing else.
@@ -494,7 +496,8 @@ _lint_rm_r() {
     _lint rm-r "$f" "line $n: rm${m#*rm}"
   done < <(_kd_grep E "$_KD_RMR_RE" "${files[@]}")
   while IFS=: read -r f n m; do
-    _lint rm-r "$f" "line $n: ${m//[[:space:]]/}"
+    m="${m#"${m%%[![:space:]]*}"}"
+    _lint rm-r "$f" "line $n: ${m:0:7}"
   done < <(_kd_grep E "$_KD_DELETE_RE" "${others[@]}")
 }
 
@@ -552,12 +555,18 @@ selftest_lints() {
   return "$SELFTEST_LINTS"
 }
 
-# cmd_selftest: the lints, then the test suite when test/run.sh exists (R3).
-# A failing suite counts as one problem. Exit 0 when there is no problem,
-# 1 otherwise.
+# cmd_selftest [--lints-only]: the lints (the syntax check among them), then
+# the test suite when test/run.sh exists (R3). --lints-only stops after the
+# lints (R35): the kit's Stop hook runs that, while kit publish and CI run
+# the whole selftest. A failing suite counts as one problem. Exit 0 when
+# there is no problem, 1 otherwise.
 cmd_selftest() {
-  local n
-  if [ $# -gt 0 ]; then die "usage: kit selftest"; fi
+  local n lints_only=0
+  if [ $# = 1 ] && [ "$1" = --lints-only ]; then
+    lints_only=1
+  elif [ $# -gt 0 ]; then
+    die "usage: kit selftest [--lints-only]"
+  fi
   if ! command -v jq > /dev/null 2>&1; then
     say "NEED jq"
     say "selftest: 1 problems"
@@ -565,7 +574,9 @@ cmd_selftest() {
   fi
   selftest_lints "$KIT_SELF" || true
   n="$SELFTEST_LINTS"
-  if [ -f "$KIT_SELF/test/run.sh" ]; then
+  if [ "$lints_only" = 1 ]; then
+    :
+  elif [ -f "$KIT_SELF/test/run.sh" ]; then
     if ! (cd -- "$KIT_SELF" && bash test/run.sh); then
       say "TESTS test/run.sh failed"
       n=$((n + 1))
@@ -583,15 +594,18 @@ cmd_selftest() {
 
 # cmd_publish: land the current topic branch on main and push main to
 # origin. It runs on a clean topic branch, after a passing selftest, and a
-# branch that changes slices/ must also change CHANGELOG.md. main moves only
-# by fast-forward; if the push fails, main goes back to where it was and the
-# topic is checked out again, so a retry starts from the same state.
+# branch that changes slices/, bin/ or lib/ must also change CHANGELOG.md
+# (M6: consumers run the CLI too). main moves only by fast-forward, and must
+# then be the topic head, which the selftest ran on (T14.1); otherwise, or if
+# the push fails, main goes back to where it was and the topic is checked out
+# again, so a retry starts from the same state.
 cmd_publish() {
-  local topic old sha
+  local topic old sha want
   if [ $# -gt 0 ]; then die "usage: kit publish"; fi
   topic="$(git -C "$KIT_SELF" symbolic-ref --short -q HEAD)" || topic=""
   if [ -z "$topic" ] || [ "$topic" = main ]; then die "publish: run it on the topic branch"; fi
   old="$(git -C "$KIT_SELF" rev-parse -q --verify refs/heads/main)" || die "publish: there is no local main branch"
+  want="$(git -C "$KIT_SELF" rev-parse HEAD)" || die "publish: cannot read the head of $topic"
   if [ -n "$(git -C "$KIT_SELF" status --porcelain)" ]; then
     say "publish: the tree is dirty; commit the changes on $topic first"
     return 1
@@ -600,9 +614,9 @@ cmd_publish() {
     say "publish: selftest failed"
     return 1
   fi
-  if [ -n "$(git -C "$KIT_SELF" diff --name-only main...HEAD -- slices)" ] &&
+  if [ -n "$(git -C "$KIT_SELF" diff --name-only main...HEAD -- slices bin lib)" ] &&
     [ -z "$(git -C "$KIT_SELF" diff --name-only main...HEAD -- CHANGELOG.md)" ]; then
-    say "publish: slices changed without a CHANGELOG entry"
+    say "publish: slices/, bin/ or lib/ changed without a CHANGELOG entry"
     return 1
   fi
   git -C "$KIT_SELF" switch -q main || die "publish: cannot switch to main"
@@ -612,6 +626,12 @@ cmd_publish() {
     return 1
   fi
   sha="$(git -C "$KIT_SELF" rev-parse HEAD)"
+  if [ "$sha" != "$want" ]; then
+    git -C "$KIT_SELF" switch -q "$topic" || die "publish: main is not at $topic's head, and cannot switch back to $topic"
+    git -C "$KIT_SELF" update-ref refs/heads/main "$old" "$sha" || die "publish: main is not at $topic's head, and cannot restore main to ${old:0:7}"
+    say "publish: main is at ${sha:0:7}, not at the head of $topic (${want:0:7}): main holds commits $topic lacks, which the selftest did not run on; bring main into $topic first"
+    return 1
+  fi
   if ! git -C "$KIT_SELF" push -q origin main; then
     git -C "$KIT_SELF" switch -q "$topic" || die "publish: the push failed, and cannot switch back to $topic"
     git -C "$KIT_SELF" update-ref refs/heads/main "$old" "$sha" || die "publish: the push failed, and cannot restore main to ${old:0:7}"
