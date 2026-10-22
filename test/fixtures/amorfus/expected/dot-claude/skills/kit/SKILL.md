@@ -18,8 +18,8 @@ This repo vendors a shared kit of Claude Code configuration at `.claude/vendor/k
 
 On the session branch, each step its own call:
 
-1. `bash .claude/vendor/kit/bin/kit bump` fetches the kit, moves the pin to the kit's published `main`, renders, and prints the CHANGELOG lines between the two pins. It prompts, and that prompt is the review. If the render fails, it restores the old pin.
-2. Read those CHANGELOG lines. A `BREAKING:` entry names the edit it needs in `.claude/kit.json` or `.claude/rules/repo.md`; make it.
+1. `bash .claude/vendor/kit/bin/kit bump` fetches the kit, moves the pin to the kit's published `main`, renders, and prints the CHANGELOG lines between the two pins. It prompts, and that prompt is the review. If the render fails, it prints those lines, then restores the old pin.
+2. Read those CHANGELOG lines. When a `BREAKING:` entry names an edit to `.claude/kit.json` or `.claude/rules/repo.md`, make that edit first, then run `kit bump` (again, if step 1 failed on it). `kit check` fails between the two steps, and that is expected: the edit is for the new pin.
 3. Run the gate: `npm run check`.
 4. `git add .claude`
 5. `git commit -m "Bump kit to <sha7>: <headline>"`

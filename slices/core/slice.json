@@ -4,7 +4,7 @@
     "gate_landing": {"default": "{{kit.gate}}", "pattern": "^[^\"'$`;&|\\\\\\n]+$"},
     "memory_root": {"default": ".claude/memory", "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$))[A-Za-z0-9._/-]+$"}
   },
-  "set": {"autoMemoryEnabled": false},
+  "set": {"autoMemoryEnabled": false, "disableAllHooks": false},
   "forbid": [
     {"entry": "Bash(git *)", "reason": "broad git pre-approves deleting branches, rewriting history and pushing"},
     {"entry": "Bash(git:*)", "reason": "the same rule as Bash(git *), which pre-approves deleting branches, rewriting history and pushing"},

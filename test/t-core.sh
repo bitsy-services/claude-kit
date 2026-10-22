@@ -45,6 +45,42 @@ t_core_kit_edit_allowed() {
     "allow: kit edit is allowed"
 }
 
+# R37: kit render is allowed bare, so render --discard prompts.
+t_core_render_allowed_exactly() {
+  local s="$CON/.claude/settings.json"
+  is "$(jq '.permissions.allow | index("Bash(bash .claude/vendor/kit/bin/kit render)") != null' "$s")" true \
+    "allow: kit render is allowed"
+  is "$(jq '[.permissions.allow[] | select(startswith("Bash(bash .claude/vendor/kit/bin/kit render "))] | length' "$s")" 0 \
+    "allow: no kit render entry takes arguments, so --discard prompts"
+}
+
+# M3: core sets disableAllHooks false, so a tracked true fails the SET row.
+t_core_set_hooks() {
+  local s="$CON/.claude/settings.json"
+  is "$(jq -c '.disableAllHooks' "$s")" false "set: render writes disableAllHooks false"
+  cp "$s" "$T/settings.bak"
+  jq '.disableAllHooks = true' "$T/settings.bak" > "$s"
+  kit_run check
+  is "$RC" 1 "set: disableAllHooks true fails check"
+  like "$OUT" '^SET disableAllHooks is true; core sets false$' "set: the SET line"
+  cp "$T/settings.bak" "$s"
+}
+
+# T9.2, T9.3, I5: what core's rules and kit skill say.
+t_core_texts() {
+  local c="$CON/.claude/rules/kit/collaboration.md" p="$CON/.claude/rules/kit/permissions.md"
+  local k="$CON/.claude/skills/kit/SKILL.md" lead
+  lead="$(sed -n '/^## Shape the answer/,/^## /{/^## /d;/^$/d;p}' "$c" | head -n 1)"
+  like "$lead" "^Unless the user's own instructions set another order" "collaboration: the section's lead line yields to the user's ordering"
+  unlike "$lead" '^- ' "collaboration: the lead line is not a bullet"
+  unlike "$(cat "$c")" '^- An answer to a question .*unless' "collaboration: the verdict bullet no longer carries the clause alone"
+  unlike "$(cat "$p")" 'Everything before the first `\*` is what limits the rule' "permissions: the false claim is gone"
+  like "$(cat "$p")" 'Only the text before the first `\*` fixes which command runs.*the rest still constrains it' \
+    "permissions: the text before the first * fixes the command, the rest still constrains it"
+  like "$(cat "$k")" 'make that edit first, then run `kit bump`' "kit skill: a BREAKING edit comes first, then the bump"
+  like "$(cat "$k")" '`kit check` fails between the two steps, and that is expected' "kit skill: check failing in between is expected"
+}
+
 t_core_check() {
   kit_run check
   is "$RC" 0 "check: kit check exits 0"
@@ -108,7 +144,10 @@ t_kit_status_hook_without_checkout() {
 t_core_rules
 t_core_gate_allowed_once
 t_core_kit_edit_allowed
+t_core_render_allowed_exactly
+t_core_texts
 t_core_check
+t_core_set_hooks
 t_memory_root_pattern
 t_memory_root_rejected
 t_kit_status_hook

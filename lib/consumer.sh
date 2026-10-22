@@ -118,15 +118,22 @@ cmd_edit() {
   say "$dest is rendered from $from at ${pin:0:7}."
   cat <<'STEPS'
 2. Claude states the change and why. A kit change reaches every consumer, so the user confirms first, as for any rules change.
-3. In the standalone clone: `git -C ~/git/bitsy-services/claude-kit switch -c <topic>`, edit the slice, add a CHANGELOG line, run `bin/kit selftest`, and commit on the topic branch. Writes outside the consumer prompt unless the user runs `/add-dir` for the clone.
-4. Optional preview: `kit bump --from ~/git/bitsy-services/claude-kit <topic>` on the consumer's session branch. Landing stays `UNPUBLISHED`, and a push of that branch aborts under `push.recurseSubmodules=check`.
+3. In the kit's own clone (ask the user where it is), never in .claude/vendor/kit: `git -C <clone> switch -c <topic>`, edit the slice, add a CHANGELOG line, run `bin/kit selftest`, and commit on the topic branch. Writes outside the consumer prompt unless the user runs `/add-dir` for the clone.
+4. Optional preview: `kit bump --from <clone> <topic>` on the consumer's session branch. Landing stays `UNPUBLISHED`, and a push of that branch aborts under `push.recurseSubmodules=check`.
 5. `kit publish` in the clone. It prompts, and the prompt is the review.
 6. `kit bump` in the consumer to the published sha, then commit and land. A fast-forward of kit `main` keeps the sha, so a preview needs no re-bump.
 STEPS
 }
 
+# _bump_changelog <old> <new>: the CHANGELOG lines added between two pins.
+_bump_changelog() {
+  git -C "$VENDOR" diff "$1" "$2" -- CHANGELOG.md | sed -n 's/^+\([^+].*\)$/\1/p'
+}
+
 # cmd_bump [<rev>] [--from <path>]: move the gitlink, render with the new
-# pin's code, show the CHANGELOG lines added. Never commits.
+# pin's code, show the CHANGELOG lines added. Never commits. When the render
+# fails, the CHANGELOG lines print before the old pin is restored, since a
+# BREAKING entry there names the edit the new pin needs.
 cmd_bump() {
   local rev="" from="" old new
   while [ $# -gt 0 ]; do
@@ -158,11 +165,12 @@ cmd_bump() {
   git -C "$VENDOR" checkout -q --detach "$new" || die "bump: cannot check out ${new:0:7}"
   git -C "$CON" add .claude/vendor/kit || die "bump: cannot stage the gitlink"
   if ! env -u KIT_PINNED bash "$VENDOR/bin/kit" render; then
+    _bump_changelog "$old" "$new"
     git -C "$VENDOR" checkout -q --detach "$old" || die "bump: cannot restore ${old:0:7}"
     git -C "$CON" add .claude/vendor/kit || die "bump: cannot re-stage ${old:0:7}"
     say "bump: render failed; restored ${old:0:7}"
     return 1
   fi
   say "bumped ${old:0:7} -> ${new:0:7}"
-  git -C "$VENDOR" diff "$old" "$new" -- CHANGELOG.md | sed -n 's/^+\([^+].*\)$/\1/p'
+  _bump_changelog "$old" "$new"
 }

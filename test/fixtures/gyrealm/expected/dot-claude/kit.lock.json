@@ -20,7 +20,7 @@
     },
     ".claude/rules/kit/collaboration.md": {
       "from": "slices/core/rules/collaboration.md",
-      "blob": "e73ecaf9e6d0b22ed1baf185b9caea28c8daf44f"
+      "blob": "7cd81b7977096eb34f5814c1b25f33bd9509dc1d"
     },
     ".claude/rules/kit/hugo-on-workers.md": {
       "from": "slices/hugo-wiki/rules/hugo-on-workers.md",
@@ -36,7 +36,7 @@
     },
     ".claude/rules/kit/permissions.md": {
       "from": "slices/core/rules/permissions.md",
-      "blob": "a91fe8b41adf57e398cd977c7fe977ce884c7f82"
+      "blob": "c533b2791321431f3db6f1e2c688a1deaa4880ed"
     },
     ".claude/rules/kit/self-improvement.md": {
       "from": "slices/self-improvement/rules/self-improvement.md",
@@ -68,7 +68,7 @@
     },
     ".claude/skills/kit/SKILL.md": {
       "from": "slices/core/skills/kit/SKILL.md",
-      "blob": "8b0ab3c8ab7cc4d35d8262680cfbf78606f7deae"
+      "blob": "a90cd39a397f735321c84b888310f96e52ee5549"
     },
     ".claude/skills/merge-to-main/SKILL.md": {
       "from": "slices/session-branch/skills/merge-to-main/SKILL.md",
@@ -129,7 +129,7 @@
         "Bash(mkdir *)",
         "Bash(bash .claude/vendor/kit/bin/kit check *)",
         "Bash(bash .claude/vendor/kit/bin/kit status *)",
-        "Bash(bash .claude/vendor/kit/bin/kit render *)",
+        "Bash(bash .claude/vendor/kit/bin/kit render)",
         "Bash(bash .claude/vendor/kit/bin/kit edit *)",
         "Bash(bash scripts/check.sh)",
         "Bash(bash scripts/check.sh --landing)",
@@ -212,6 +212,7 @@
     }
   },
   "set": {
-    "autoMemoryEnabled": false
+    "autoMemoryEnabled": false,
+    "disableAllHooks": false
   }
 }

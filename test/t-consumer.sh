@@ -116,7 +116,8 @@ t_edit() {
   kit_run edit .claude/rules/kit/a.md
   is "$RC" 0 "edit: exits 0"
   like "$OUT" '^\.claude/rules/kit/a\.md is rendered from slices/core/rules/a\.md at [0-9a-f]{7}\.$' "edit: names the source and pin"
-  like "$OUT" '^3\. In the standalone clone: `git -C ~/git/bitsy-services/claude-kit switch -c <topic>`' "edit: authoring steps"
+  like "$OUT" "^3\. In the kit's own clone \(ask the user where it is\)" "edit: authoring steps name the kit's own clone"
+  unlike "$OUT" '~/|bitsy-services' "edit: no path on any one machine"
   like "$OUT" '^6\. `kit bump` in the consumer' "edit: last step"
   kit_run edit CLAUDE.md
   is "$RC" 1 "edit: a non-rendered dest exits 1"
@@ -152,6 +153,37 @@ t_bump_failure() {
   is "$(git -C "$CON/.claude/vendor/kit" rev-parse HEAD)" "$oldpin" "bump failure: checkout back at the old pin"
 }
 
+# I5/R24: a BREAKING change that needs a kit.json edit. The failed bump shows
+# the CHANGELOG lines before it restores the old pin. The edit is made first;
+# check fails until the bump, as expected; then the bump succeeds.
+t_bump_breaking() {
+  fresh
+  local oldpin at_line at_restored
+  oldpin="$(git -C "$CON" ls-files -s .claude/vendor/kit | cut -d' ' -f2)"
+  jq '.params.region = {"required": true, "pattern": "^[a-z]+$"}' "$T/kit/slices/core/slice.json" > "$T/s.json"
+  cp "$T/s.json" "$T/kit/slices/core/slice.json"
+  echo '- BREAKING: core requires the param region; add "region": "<name>" to params in .claude/kit.json, then bump.' >> "$T/kit/CHANGELOG.md"
+  kit_commit "require region"
+  kit_run bump --from "$T/kit" main
+  is "$RC" 1 "breaking: the bump exits 1"
+  like "$OUT" '^CONFIG param region \(core\) is required$' "breaking: the render names the missing param"
+  at_line="$(printf '%s\n' "$OUT" | grep -n '^- BREAKING: core requires the param region' | head -n 1 | cut -d: -f1)"
+  at_restored="$(printf '%s\n' "$OUT" | grep -n '^bump: render failed; restored ' | head -n 1 | cut -d: -f1)"
+  is "$([ -n "$at_line" ] && [ -n "$at_restored" ] && [ "$at_line" -lt "$at_restored" ] && echo before \
+    || echo "CHANGELOG at ${at_line:-none}, restored at ${at_restored:-none}")" before \
+    "breaking: the CHANGELOG lines print before the restore line"
+  is "$(git -C "$CON" ls-files -s .claude/vendor/kit | cut -d' ' -f2)" "$oldpin" "breaking: gitlink back at the old pin"
+  jq -c '.params.region = "west"' "$CON/.claude/kit.json" > "$T/k.json"
+  cp "$T/k.json" "$CON/.claude/kit.json"
+  kit_run check
+  is "$RC" 1 "breaking: with the edit made first, check fails under the old pin"
+  like "$OUT" '^CONFIG unknown param "region"' "breaking: the old pin does not know the param"
+  kit_run bump --from "$T/kit" main
+  is "$RC" 0 "breaking: then the bump succeeds"
+  kit_run check
+  is "$RC" 0 "breaking: and check passes"
+}
+
 # R13
 t_excluded_notice() {
   fresh
@@ -177,5 +209,6 @@ t_scaffold_memory_root
 t_edit
 t_bump
 t_bump_failure
+t_bump_breaking
 t_excluded_notice
 done_testing
