@@ -9,6 +9,6 @@ How a Bash rule matches, per the Claude Code docs:
 - `Bash(ls:*)` is the same rule as `Bash(ls *)`. The `:*` form works only at the end.
 
 Practice:
-- Keep bare `Edit` and `Write` in the allow list. If edits outside `.claude/` start to prompt, the session's permission mode has likely drifted: tell the user that Shift+Tab cycles it back. Writes under `.claude/` prompt whatever the allow list says, because Claude Code protects that directory.
+- Keep bare `Edit` and `Write` in the allow list. If edits outside `.claude/` prompt, check that bare `Edit` and `Write` are in the allow list in effect and that the path is inside the working directories; meanwhile Shift+Tab to accept-edits unblocks the session. Writes under `.claude/` prompt whatever the allow list says, because Claude Code protects that directory.
 - When a prompt recurs, propose the exact entry that covers it, for `.claude/settings.json`. Never broaden an entry to cover a compound statement; split the command instead.
 - The kit forbids some broad entries, such as `Bash(gh *)` and `Bash(npm run *)`. `kit check` fails while one is in `permissions.allow` and names the harm; allow the narrow verbs instead.
