@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(merge-to-main)",
+      "Skill(sync-with-main)",
+      "Bash(git add *)",
+      "Bash(git switch *)",
+      "Bash(git commit *)",
+      "Bash(git fetch {{kit.remote}})",
+      "Bash(git fetch {{kit.remote}} {{kit.trunk}}:{{kit.trunk}})",
+      "Bash(git merge --ff-only *)",
+      "Bash(git merge {{kit.trunk}})",
+      "Bash(git merge --abort)",
+      "Bash(git rebase {{kit.trunk}})",
+      "Bash(git rebase --continue)",
+      "Bash(git rebase --abort)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [{"type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/kit/guard-git.sh\""}]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [{"type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/kit/branch-context.sh\""}]
+      }
+    ]
+  }
+}

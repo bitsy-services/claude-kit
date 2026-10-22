@@ -1,0 +1,17 @@
+{
+  "requires": ["core"],
+  "params": {
+    "trunk": {"default": "main", "pattern": "^[A-Za-z0-9._/-]+$"},
+    "remote": {"default": "origin", "pattern": "^[A-Za-z0-9._/-]+$"}
+  },
+  "headings": ["Deploy", "Gate", "Conflict stops", "Branch names"],
+  "forbid": [
+    {"entry": "Bash(git push *)", "reason": "a push must prompt, since that prompt confirms anything leaving this clone, a deploy included"},
+    {"entry": "Bash(git branch *)", "reason": "broad git branch pre-approves deleting branches and moving the trunk"},
+    {"entry": "Bash(git fetch *)", "reason": "broad git fetch pre-approves a forced or local fetch into the trunk"},
+    {"entry": "Bash(git merge *)", "reason": "broad git merge pre-approves merge commits on the trunk"},
+    {"entry": "Bash(git rebase *)", "reason": "broad git rebase pre-approves rewriting the trunk"},
+    {"entry": "Bash(git reset *)", "reason": "git reset moves the current branch and can discard uncommitted work"},
+    {"entry": "Bash(git update-ref *)", "reason": "git update-ref moves or deletes any ref, the trunk included"}
+  ]
+}
