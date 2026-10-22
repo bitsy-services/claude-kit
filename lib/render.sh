@@ -101,12 +101,24 @@ render_expected() {
   mv -- "$out/lock.new" "$out/lock.json" || return 2
 }
 
+# The consumer's settings, as the merge reads them: permissions, when set,
+# is an object, and its allow, ask and deny, when set, are arrays. One
+# RENDER line per shape that does not hold.
+_RENDER_SHAPE_JQ='
+.permissions as $p
+| if $p == null then empty
+  elif ($p | type) != "object" then "RENDER .claude/settings.json permissions is not an object; fix it"
+  else ("allow", "ask", "deny") | select(($p[.] // []) | type != "array")
+       | "RENDER .claude/settings.json permissions.\(.) is not an array; fix it"
+  end'
+
 # render_settings <outdir>: substitute and parse each enabled slice's
 # settings.json, then merge them three-way into the consumer's settings.
 # Writes <outdir>/merged.json and <outdir>/settings.json. Prints RENDER lines
-# and returns 1 for a fragment that is not valid JSON.
+# and returns 1 for a fragment that is not valid JSON, or for consumer
+# settings whose permissions the merge cannot read.
 render_settings() {
-  local out="$1" slice frag cur lock rc=0 r
+  local out="$1" slice frag cur lock rc=0 r line
   : > "$out/frags.jsonl"
   while IFS= read -r slice; do
     frag="$out/tree/slices/$slice/settings.json"
@@ -136,6 +148,11 @@ render_settings() {
   else
     echo '{}' > "$cur"
   fi
+  while IFS= read -r line; do
+    say "$line"
+    rc=1
+  done < <(jq -r "$_RENDER_SHAPE_JQ" "$cur")
+  [ "$rc" = 0 ] || return 1
   if [ -f "$LOCK" ] && jq -e 'type == "object"' "$LOCK" > /dev/null 2>&1; then
     cp -- "$LOCK" "$lock" || return 2
   else

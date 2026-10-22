@@ -73,6 +73,49 @@ t_forbid() {
   edit_settings '.permissions.allow += ["Bash(gh *)"]'
   kit_run check
   only "forbid" "FORBID Bash(gh *) in permissions.allow (core): broad gh can move origin/main without the push prompt"
+  rendered
+  edit_settings '.permissions.allow += ["Bash(gh:*)"]'
+  kit_run check
+  only "forbid colon" "FORBID Bash(gh:*) in permissions.allow covers Bash(gh *) (core): broad gh can move origin/main without the push prompt"
+  rendered
+  edit_settings '.permissions.allow += ["Bash"]'
+  kit_run check
+  only "forbid bare" "FORBID Bash in permissions.allow covers Bash(gh *) (core): broad gh can move origin/main without the push prompt"
+  rendered
+  edit_settings '.permissions.allow += ["Bash(ghq *)", "Bash(gh pr view *)", "Bash(gh)"]'
+  kit_run check
+  is "$RC" 0 "forbid: narrower and unrelated entries pass"
+}
+
+# M2: permissions.allow, ask and deny hold only strings.
+t_settings_entries() {
+  local k v
+  for k in allow ask deny; do
+    for v in 42 null '{}'; do
+      rendered
+      edit_settings ".permissions.$k = ((.permissions.$k // []) + [$v])"
+      kit_run check
+      only "settings $k $v" "SETTINGS permissions.$k entry $v is not a string"
+    done
+  done
+}
+
+# A permissions list that is not an array is named, not an internal error.
+t_settings_shape() {
+  local v
+  for v in 42 '{}' '"Read"'; do
+    rendered
+    edit_settings ".permissions.allow = $v"
+    kit_run check
+    only "settings shape $v" "RENDER .claude/settings.json permissions.allow is not an array; fix it"
+  done
+  rendered
+  edit_settings '.permissions = 42'
+  kit_run check
+  only "settings shape permissions" "RENDER .claude/settings.json permissions is not an object; fix it"
+  kit_run render
+  is "$RC" 1 "settings shape: render exits 1"
+  has_line "$OUT" "RENDER .claude/settings.json permissions is not an object; fix it" "settings shape: render names it"
 }
 
 t_breadth() {
@@ -129,6 +172,11 @@ t_links() {
   kit_run check
   has_line "$OUT" "LINK CLAUDE.md -> nowhere.md" "link: CLAUDE.md is scanned"
   unlike "$OUT" 'LINK .*vendor' "link: the vendored kit is not scanned"
+  # I4: a leading-/ target is a site URL in a Hugo repo, not a repo path.
+  rendered
+  printf 'See [w](/wiki/places/) and [r](/README.md) and [x](missing.md).\n' > "$CON/.claude/rules/local.md"
+  kit_run check
+  only "link site url" "LINK .claude/rules/local.md -> missing.md"
 }
 
 t_dangling() {
@@ -208,6 +256,8 @@ t_clone() {
 t_clean
 t_settings
 t_forbid
+t_settings_entries
+t_settings_shape
 t_breadth
 t_set
 t_memory

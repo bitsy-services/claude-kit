@@ -10,6 +10,7 @@
     {"entry": "Bash(git:*)", "reason": "the same rule as Bash(git *), which pre-approves deleting branches, rewriting history and pushing"},
     {"entry": "Bash(git config *)", "reason": "git config can set an alias or core.fsmonitor, and either runs any command"},
     {"entry": "Bash(git submodule *)", "reason": "git submodule foreach runs any command"},
+    {"entry": "Bash(git -C *)", "reason": "git -C <dir> runs any git subcommand, so it pre-approves pushing, deleting branches and rewriting history"},
     {"entry": "Bash(gh *)", "reason": "broad gh can move origin/main without the push prompt"},
     {"entry": "Bash(gh api *)", "reason": "gh api can write to the remote and move origin/main without the push prompt"},
     {"entry": "Bash(npm *)", "reason": "broad npm pre-approves npm run deploy; allow named scripts instead"},

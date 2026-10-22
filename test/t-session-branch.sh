@@ -110,6 +110,36 @@ t_forbid() {
   cp "$T/settings.bak" "$SETTINGS"
 }
 
+# C1: a forbidden entry spelled another way, or a broader entry, fails too.
+# Each case is <allow entry>|<the FORBID line>.
+t_forbid_spellings() {
+  local e want
+  cp "$SETTINGS" "$T/settings.bak"
+  while IFS='|' read -r e want; do
+    jq --arg e "$e" '.permissions.allow += [$e]' "$T/settings.bak" > "$SETTINGS"
+    kit_run check
+    is "$RC" 1 "forbid $e: check exits 1"
+    is "$(printf '%s\n' "$OUT" | grep -c '^FORBID ')" 1 "forbid $e: one FORBID line"
+    is "$(printf '%s\n' "$OUT" | grep '^FORBID ')" "$want" "forbid $e: the line"
+  done << 'EOF'
+Bash(gh:*)|FORBID Bash(gh:*) in permissions.allow covers Bash(gh *) (core): broad gh can move origin/main without the push prompt
+Bash(git push:*)|FORBID Bash(git push:*) in permissions.allow covers Bash(git push *) (session-branch): a push must prompt, since that prompt confirms anything leaving this clone, a deploy included
+Bash(npm run:*)|FORBID Bash(npm run:*) in permissions.allow covers Bash(npm run *) (core): npm run * pre-approves npm run deploy; allow named scripts instead
+Bash|FORBID Bash in permissions.allow covers Bash(git *) (core): broad git pre-approves deleting branches, rewriting history and pushing
+Bash(*)|FORBID Bash(*) in permissions.allow covers Bash(git *) (core): broad git pre-approves deleting branches, rewriting history and pushing
+Bash(gh*)|FORBID Bash(gh*) in permissions.allow covers Bash(gh *) (core): broad gh can move origin/main without the push prompt
+Bash(git -C *)|FORBID Bash(git -C *) in permissions.allow (core): git -C <dir> runs any git subcommand, so it pre-approves pushing, deleting branches and rewriting history
+Bash(git -C * push *)|FORBID Bash(git -C * push *) in permissions.allow covers Bash(git -C *) (core): git -C <dir> runs any git subcommand, so it pre-approves pushing, deleting branches and rewriting history
+Bash(git p*)|FORBID Bash(git p*) in permissions.allow covers Bash(git push *) (session-branch): a push must prompt, since that prompt confirms anything leaving this clone, a deploy included
+EOF
+  # Narrow entries, and entries of other tools, are not forbidden.
+  jq '.permissions.allow += ["Bash(git push origin topic)", "Bash(npm run build)", "Bash(ghq *)", "Bash(git pushd *)", "WebFetch(domain:gh)"]' \
+    "$T/settings.bak" > "$SETTINGS"
+  kit_run check
+  is "$RC" 0 "forbid: narrow entries pass"
+  cp "$T/settings.bak" "$SETTINGS"
+}
+
 t_repo_lacks_gate() {
   local md="$CON/.claude/rules/repo.md"
   cp "$md" "$T/repo.bak"
@@ -160,6 +190,7 @@ t_no_placeholder_left
 t_published_before_landing
 t_check
 t_forbid
+t_forbid_spellings
 t_repo_lacks_gate
 t_context_on_trunk
 t_context_on_branch

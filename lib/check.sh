@@ -147,9 +147,11 @@ check_lock() {
   check_problem "STALE LOCK .claude/kit.lock.json differs from a fresh render at $CHECK_PIN7: run kit render"
 }
 
-# settings: every kit entry the fresh render carries is in the consumer's
-# settings, compared as flattened lists. The slice of an entry is the first
-# enabled slice whose fragment holds it; hooks are reported without one.
+# settings: permissions.allow, ask and deny hold only strings, and every kit
+# entry the fresh render carries is in the consumer's settings, compared as
+# flattened lists. The slice of an entry is the first enabled slice whose
+# fragment holds it; hooks are reported without one. A list that is not an
+# array never gets here: render refuses it, so the config row reports it.
 check_settings() {
   local s cur="$CHECK_TMP/cur.json" names=() defs line
   defs="$(sed -n '/^def uniq/,/^def merge/{/^def merge/!p}' "$KIT_SELF/lib/settings.jq")"
@@ -171,6 +173,10 @@ check_settings() {
       | def owner($k; $x):
           first(range(0; $names | length) | select(any(($fr[.] | flatten)[$k][]; . == $x)) | $names[.]) // "?";
       ( ["allow", "ask", "deny"][] as $k
+        | $cf[$k] | if type == "array" then .[] else empty end
+        | select(type != "string")
+        | "SETTINGS permissions.\($k) entry \(tojson) is not a string" ),
+      ( ["allow", "ask", "deny"][] as $k
         | ($lock[0].settings.kit[$k] // [])[] | . as $x
         | select(any($cf[$k][]; . == $x) | not)
         | "SETTINGS missing \($k) \($x) (\(owner($k; $x)))" ),
@@ -179,15 +185,36 @@ check_settings() {
         | "SETTINGS missing hook \(.[0]) \(.[1]) \(.[2].command // (.[2] | tojson))" )')
 }
 
-# forbid: no forbidden entry in the consumer's permissions.allow.
+# forbid: no allow entry is a forbidden entry, the same rule spelled another
+# way, or a broader rule. Both sides are normalised first, a trailing ":*)"
+# read as " *)" and bare Bash as Bash(*). An allow entry covers a forbidden
+# one when the two are equal, or when both are Bash(...) and the allow
+# entry's text before its first * is a prefix of the forbidden entry's text.
+# Entries of other tools compare exactly. One line per allow entry, naming
+# the first forbidden entry it covers.
 check_forbid() {
   local line
   while IFS= read -r line; do
     check_problem "$line"
-  done < <(jq -r --slurpfile cur "$CHECK_TMP/cur.json" \
-      '($cur[0].permissions.allow // []) as $a
-       | .forbid[] | select(. as $f | any($a[]; . == $f.entry))
-       | "FORBID \(.entry) in permissions.allow (\(.slice)): \(.reason)"' "$CHECK_EXP/config.json")
+  done < <(jq -r --slurpfile cur "$CHECK_TMP/cur.json" '
+      def norm: if . == "Bash" then "Bash(*)"
+                elif test("^Bash\\(.*:\\*\\)$") then .[:-3] + " *)"
+                else . end;
+      def inner: if startswith("Bash(") and endswith(")") then .[5:-1] else null end;
+      def covers($f):
+        norm as $a | ($f | norm) as $n
+        | $a == $n
+          or (($a | inner) as $ai | ($n | inner) as $ni
+              | $ai != null and $ni != null and ($ai | contains("*"))
+                and ($ni | startswith($ai | split("*")[0])));
+      .forbid as $fb
+      | $cur[0].permissions | if type == "object" then .allow else null end
+      | if type == "array" then .[] | strings else empty end
+      | . as $x
+      | first($fb[] | select(. as $f | $x | covers($f.entry)))
+      | if $x == .entry then "FORBID \(.entry) in permissions.allow (\(.slice)): \(.reason)"
+        else "FORBID \($x) in permissions.allow covers \(.entry) (\(.slice)): \(.reason)" end' \
+      "$CHECK_EXP/config.json")
 }
 
 # breadth: no allow entry has a wildcard that starts an argument.
@@ -195,7 +222,8 @@ check_breadth() {
   local e
   while IFS= read -r e; do
     check_problem "BREADTH $e"
-  done < <(jq -r '(.permissions.allow // [])[] | strings' "$CHECK_TMP/cur.json" \
+  done < <(jq -r '.permissions | if type == "object" then .allow else null end
+                  | if type == "array" then .[] | strings else empty end' "$CHECK_TMP/cur.json" \
       | grep -E -- '\*[[:space:]]+[^*[:space:])]' || true)
 }
 
@@ -295,16 +323,13 @@ md_links() {
 }
 
 # _check_links_in <file> <rel>: LINK for each relative link whose target does
-# not exist.
+# not exist. A target with a leading / is skipped, as a scheme: URL is: in a
+# site repo it is a URL path on the site, not a path in the repo.
 _check_links_in() {
   local f="$1" rel="$2" t base
   base="${f%/*}"
   while IFS= read -r t; do
-    if [[ $t == /* ]]; then
-      if [ -e "$CON${t//%20/ }" ]; then continue; fi
-    elif [ -e "$base/${t//%20/ }" ]; then
-      continue
-    fi
+    if [[ $t == /* ]] || [ -e "$base/${t//%20/ }" ]; then continue; fi
     check_problem "LINK $rel -> $t"
   done < <(md_links "$f")
 }
