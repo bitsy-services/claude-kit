@@ -59,6 +59,17 @@ unlike "$OUT" 'gate_landing' "no cascade from an invalid param"
 resolve "$(edit '.params.gate_landing="a {{kit.gate}} b"')"
 is "$RC" 0 "explicit value is taken as given"
 
+# R34: a jq pattern's $ matches before a trailing newline, so a newline is
+# rejected on its own, wherever it is.
+resolve "$(edit '.params.gate="make check\n"')"
+is "$RC" 1 "a trailing newline fails"
+like "$OUT" '^CONFIG param gate value contains a newline$' "trailing newline line"
+unlike "$OUT" 'does not match its pattern' "trailing newline: no pattern line"
+unlike "$OUT" 'gate_landing' "no cascade from a newline value"
+resolve "$(edit '.params.gate="make\ncheck"')"
+is "$RC" 1 "a newline mid-value fails"
+like "$OUT" '^CONFIG param gate value contains a newline$' "mid-value newline line"
+
 # duplicate destination across two enabled slices
 mkdir -p "$T/kit/slices/extra/rules"
 git -C "$T/kit" show HEAD:slices/core/rules/a.md > "$T/kit/slices/extra/rules/a.md"

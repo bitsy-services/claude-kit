@@ -2,7 +2,7 @@
   "params": {
     "gate": {"required": true, "pattern": "^[^\"'$`;&|\\\\\\n]+$"},
     "gate_landing": {"default": "{{kit.gate}}", "pattern": "^[^\"'$`;&|\\\\\\n]+$"},
-    "memory_root": {"default": ".claude/memory", "pattern": "^[A-Za-z0-9._/-]+$"}
+    "memory_root": {"default": ".claude/memory", "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$))[A-Za-z0-9._/-]+$"}
   },
   "set": {"autoMemoryEnabled": false},
   "forbid": [

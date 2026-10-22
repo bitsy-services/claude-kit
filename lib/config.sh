@@ -8,7 +8,10 @@ _CONFIG_JQ='
 def refs: [scan("\\{\\{kit\\.([A-Za-z0-9_]+)\\}\\}") | .[0]];
 def subst($r): gsub("\\{\\{kit\\.(?<n>[A-Za-z0-9_]+)\\}\\}"; $r[.n]);
 def hs($o): . as $k | $o | has($k);
-def good($d): (.value | type == "string") and (. as $e | ($d[$e.key].pattern // null) as $p | $p == null or ($e.value | test($p)));
+# A newline fails on its own (R34): the $ of a pattern matches before a trailing one.
+def nl: type == "string" and contains("\n");
+def good($d): (.value | type == "string") and (.value | nl | not)
+  and (. as $e | ($d[$e.key].pattern // null) as $p | $p == null or ($e.value | test($p)));
 def strs: type == "array" and all(.[]; type == "string");
 
 $cfg[0] as $k
@@ -48,8 +51,10 @@ $cfg[0] as $k
       | "CONFIG unknown param \"\(.)\" (no enabled slice declares it)" ] as $e_uparam
   | ( [ $params | to_entries[] | select(.key | hs($declared)) | select(.value | type != "string")
         | "CONFIG param \(.key) must be a string" ] ) as $e_type
+  | ( [ $params | to_entries[] | select(.key | hs($declared)) | select(.value | nl)
+        | "CONFIG param \(.key) value contains a newline" ] ) as $e_nl
   | ( [ $params | to_entries[] | select(.key | hs($declared)) | select(.value | type == "string")
-        | select(good($declared) | not)
+        | select(.value | nl | not) | select(good($declared) | not)
         | "CONFIG param \(.key) value does not match its pattern" ] ) as $e_pat
   | ( {
         res: ($params | with_entries(select((.key | hs($declared)) and (.value | type == "string") and good($declared)))),
@@ -82,7 +87,7 @@ $cfg[0] as $k
       | "CONFIG \($f[0]) is rendered by both \($f[2]) and \(.[2])" ] as $e_dest
   | {
       errs: ($e_fmt + $e_keys + $e_t1 + $e_t2 + $e_t3 + $e_dup + $e_unk + $e_core + $e_req + $e_con
-             + $e_decl + $e_nopat + $e_required + $e_uparam + $e_type + $e_pat + $fx.errs + $e_unres + $e_dest),
+             + $e_decl + $e_nopat + $e_required + $e_uparam + $e_type + $e_nl + $e_pat + $fx.errs + $e_unres + $e_dest),
       result: {
         slices: $enabled,
         params: ($fx.res | to_entries | sort_by(.key) | from_entries),

@@ -51,6 +51,38 @@ t_core_check() {
   like "$OUT" '^kit check: ok$' "check: kit check reports ok"
 }
 
+# memory_root is a path inside the repo: no leading /, no .. segment.
+t_memory_root_pattern() {
+  local p v want
+  p="$(jq -r '.params.memory_root.pattern' "$TEST_ROOT/slices/core/slice.json")"
+  while IFS='|' read -r v want; do
+    is "$(jq -n --arg v "$v" --arg p "$p" '$v | test($p)')" "$want" "memory_root pattern: $v"
+  done << 'EOF'
+.claude/memory|true
+memory|true
+docs/a..b/.mem|true
+..mem/x|true
+/abs/memory|false
+..|false
+../memory|false
+.claude/../memory|false
+memory/..|false
+memory/../..|false
+EOF
+}
+
+t_memory_root_rejected() {
+  local v
+  cp "$CON/.claude/kit.json" "$T/kit.bak"
+  for v in /abs/memory ../elsewhere; do
+    jq -c --arg v "$v" '.params.memory_root = $v' "$T/kit.bak" > "$CON/.claude/kit.json"
+    kit_run check
+    is "$RC" 1 "memory_root $v: check exits 1"
+    like "$OUT" '^CONFIG param memory_root value does not match its pattern$' "memory_root $v: the pattern line"
+  done
+  cp "$T/kit.bak" "$CON/.claude/kit.json"
+}
+
 t_kit_status_hook() {
   status_hook
   is "$RC" 0 "status: the hook exits 0"
@@ -77,6 +109,8 @@ t_core_rules
 t_core_gate_allowed_once
 t_core_kit_edit_allowed
 t_core_check
+t_memory_root_pattern
+t_memory_root_rejected
 t_kit_status_hook
 t_kit_status_hook_without_jq
 t_kit_status_hook_without_checkout
