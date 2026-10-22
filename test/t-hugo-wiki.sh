@@ -45,8 +45,20 @@ t_on_workers_scoped() {
   like "$fm" '^paths:' "hugo-on-workers: frontmatter has paths:"
   unlike "$fm" '^globs:' "hugo-on-workers: frontmatter has no globs:"
   got="$(printf '%s\n' "$fm" | sed -n 's/^[[:space:]]*-[[:space:]]*"\{0,1\}\([^"]*\)"\{0,1\}[[:space:]]*$/\1/p' | tr '\n' ' ')"
-  is "$got" 'hugo.toml wrangler.* layouts/** scripts/** ' \
-    "hugo-on-workers: paths are hugo.toml, wrangler.*, layouts/** and scripts/**"
+  is "$got" '**/hugo.toml **/wrangler.* **/layouts/** **/scripts/** ' \
+    "hugo-on-workers: paths are **/hugo.toml, **/wrangler.*, **/layouts/** and **/scripts/**"
+}
+
+# R29: knowledge needed while writing a page is always on; the vendor/
+# gitignore trap is not in this slice.
+t_moved() {
+  like "$(cat "$RULES/wiki-content.md" 2> /dev/null)" "ignoreFiles = \['CLAUDE\\\\\.md\\$'\]" \
+    "wiki-content: carries the ignoreFiles line"
+  like "$(cat "$RULES/wiki-content.md" 2> /dev/null)" '`kind`' "wiki-content: carries the reserved keys"
+  like "$(cat "$RULES/wiki-linking.md" 2> /dev/null)" '`bash scripts/check\.sh` must check links' \
+    "wiki-linking: the gate checks plain links"
+  is "$(cat "$RULES"/wiki-*.md "$RULES/hugo-on-workers.md" 2> /dev/null | grep -c 'vendor/')" 0 \
+    "rules: no vendor/ gitignore trap"
 }
 
 t_always_on() {
@@ -82,16 +94,21 @@ t_check() {
 }
 
 t_forbid() {
+  local e re
   cp "$SETTINGS" "$T/settings.bak"
-  jq '.permissions.allow += ["Bash(hugo *)"]' "$T/settings.bak" > "$SETTINGS"
-  kit_run check
-  is "$RC" 1 "forbid: check exits 1"
-  like "$OUT" '^FORBID Bash\(hugo \*\) in permissions\.allow \(hugo-wiki\): ' "forbid: hugo * is named"
+  for e in 'Bash(hugo *)' 'Bash(hugo:*)' 'Bash(hugo deploy *)' 'Bash(hugo deploy:*)'; do
+    jq --arg e "$e" '.permissions.allow += [$e]' "$T/settings.bak" > "$SETTINGS"
+    kit_run check
+    is "$RC" 1 "forbid $e: check exits 1"
+    re="$(printf '%s' "$e" | sed 's/[][\.*^$()+?{}|]/\\&/g')"
+    like "$OUT" "^FORBID $re in permissions\\.allow \\(hugo-wiki\\): " "forbid $e: named"
+  done
   cp "$T/settings.bak" "$SETTINGS"
 }
 
 t_wiki_dir_rendered
 t_on_workers_scoped
+t_moved
 t_always_on
 t_no_placeholder_left
 t_allows

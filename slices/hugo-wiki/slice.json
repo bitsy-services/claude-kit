@@ -5,6 +5,8 @@
   },
   "forbid": [
     {"entry": "Bash(hugo *)", "reason": "broad hugo pre-approves hugo deploy, which uploads the built site to a remote target"},
-    {"entry": "Bash(hugo deploy *)", "reason": "hugo deploy uploads the built site to a remote target, so it must prompt"}
+    {"entry": "Bash(hugo:*)", "reason": "the same rule as Bash(hugo *), which pre-approves hugo deploy, an upload of the built site to a remote target"},
+    {"entry": "Bash(hugo deploy *)", "reason": "hugo deploy uploads the built site to a remote target, so it must prompt"},
+    {"entry": "Bash(hugo deploy:*)", "reason": "the same rule as Bash(hugo deploy *); hugo deploy uploads the built site to a remote target, so it must prompt"}
   ]
 }
