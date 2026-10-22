@@ -106,13 +106,13 @@ _render_dest_ok() {
 
 # cmd_render [--discard]: install the rendered pin into the consumer. Every
 # destination is checked before anything is written. Only lock-named paths
-# that are no longer rendered are removed, then empty skill directories.
-# The scratch directory is left in place: lib/ removes no path the lock
-# does not name.
+# that are neither rendered nor excluded are removed, then empty skill
+# directories. An excluded dest is never written, refused or removed: it
+# leaves `files` for `excluded` and stays on disk as it is (R9).
 cmd_render() {
   local discard=0 tmp d b p cur bad=0
   local -a dests=() olds=() orphans=()
-  local -A want=() owned=() have=()
+  local -A want=() owned=() have=() excl=()
   while [ $# -gt 0 ]; do
     case "$1" in
       --discard) discard=1 ;;
@@ -121,13 +121,16 @@ cmd_render() {
     shift
   done
   ctx_consumer
-  tmp="$(mktemp -d)" || die "render: cannot make a scratch directory"
+  scratch_new tmp || die "render: cannot make a scratch directory"
   render_expected "$tmp" || return $?
 
   while IFS=$'\t' read -r d b; do
     dests+=("$d")
     want["$d"]="$b"
   done < <(jq -r '.files | to_entries[] | "\(.key)\t\(.value.blob)"' "$tmp/lock.json")
+  while IFS= read -r d; do
+    excl["$d"]=1
+  done < <(jq -r '.excluded | keys[]' "$tmp/lock.json")
   if [ -e "$LOCK" ]; then
     if ! jq -e 'type == "object" and ((.files // {}) | type == "object"
           and all(.[]; type == "object" and (.blob | type) == "string"))' "$LOCK" > /dev/null 2>&1; then
@@ -154,7 +157,7 @@ cmd_render() {
     fi
   done
   for d in "${olds[@]}"; do
-    if [ -n "${want[$d]+x}" ]; then continue; fi
+    if [ -n "${want[$d]+x}" ] || [ -n "${excl[$d]+x}" ]; then continue; fi
     if ! _render_dest_ok "$d"; then
       say "RENDER .claude/kit.lock.json names $d, which is not a kit destination"
       bad=1

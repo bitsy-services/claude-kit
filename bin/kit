@@ -70,10 +70,13 @@ main() {
       echo "NOT PRESENT ${pin:0:7} run: git submodule update --init .claude/vendor/kit"
       exit 1
     fi
-    local tmp
-    tmp="$(mktemp -d)"
-    extract "$pin" "$tmp" bin lib
-    KIT_PINNED="$pin" exec bash "$tmp/bin/kit" "$cmd" "$@"
+    local tmp rc=0
+    scratch_new tmp || die "internal error: cannot make a scratch directory"
+    extract "$pin" "$tmp" bin lib || die "internal error: cannot extract the kit at ${pin:0:7}"
+    # A child, not exec, so this process can remove the extract afterwards.
+    KIT_PINNED="$pin" bash "$tmp/bin/kit" "$cmd" "$@" || rc=$?
+    scratch_cleanup
+    exit "$rc"
   fi
   run_cmd "$cmd" "$@"
 }

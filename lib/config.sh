@@ -102,7 +102,7 @@ config_resolve() {
   local tree="$1" out="$2" work name dir f n
   [ -f "$KITJSON" ] || { say "CONFIG .claude/kit.json is missing"; return 1; }
   jq -e . "$KITJSON" >/dev/null 2>&1 || { say "CONFIG .claude/kit.json is not valid JSON"; return 1; }
-  work="$(mktemp -d)" || return 2
+  scratch_new work || return 2
   : > "$work/sl.jsonl"
   : > "$work/paths.tsv"
   while IFS= read -r name; do
@@ -111,7 +111,7 @@ config_resolve() {
     [ -d "$dir" ] || continue
     if [ -f "$dir/slice.json" ]; then
       jq -c --arg n "$name" '{name: $n, decl: .}' "$dir/slice.json" >> "$work/sl.jsonl" \
-        || { rm -rf "$work"; say "CONFIG slices/$name/slice.json is not valid JSON"; return 1; }
+        || { say "CONFIG slices/$name/slice.json is not valid JSON"; return 1; }
     else
       jq -nc --arg n "$name" '{name: $n, decl: {}}' >> "$work/sl.jsonl"
     fi
@@ -133,16 +133,13 @@ config_resolve() {
   if ! jq -n --slurpfile cfg "$KITJSON" --slurpfile sl "$work/sl.jsonl" --rawfile paths "$work/paths.tsv" \
       "$_CONFIG_JQ" > "$work/res.json" 2> "$work/err"; then
     cat "$work/err" >&2
-    rm -rf "$work"
     return 2
   fi
   n="$(jq '.errs | length' "$work/res.json")"
   if [ "$n" != 0 ]; then
     jq -r '.errs[]' "$work/res.json"
-    rm -rf "$work"
     return 1
   fi
   jq '.result' "$work/res.json" > "$out"
-  rm -rf "$work"
   return 0
 }

@@ -232,6 +232,52 @@ t_render_usage() {
   is "$RC" 2 "usage: an unknown flag exits 2"
 }
 
+# R9: "replace a kit file" is exclude it and write your own; render keeps it.
+t_render_exclude_keeps_own() {
+  fresh
+  kit_run render
+  set_kitjson '.exclude=[".claude/rules/kit/a.md"]'
+  printf 'my own rule\n' > "$CON/.claude/rules/kit/a.md"
+  kit_run render
+  is "$RC" 0 "exclude_own: excluding an owned dest and replacing it exits 0"
+  is "$(cat "$CON/.claude/rules/kit/a.md")" "my own rule" "exclude_own: own content kept"
+  is "$(jq -r '.files | has(".claude/rules/kit/a.md")' "$CON/.claude/kit.lock.json")" false "exclude_own: dropped from files"
+  is "$(jq -r '.excluded | has(".claude/rules/kit/a.md")' "$CON/.claude/kit.lock.json")" true "exclude_own: recorded in excluded"
+  kit_run render --discard
+  is "$RC" 0 "exclude_own: --discard exits 0"
+  is "$(cat "$CON/.claude/rules/kit/a.md")" "my own rule" "exclude_own: --discard keeps own content too"
+}
+
+t_render_exclude_keeps_stamped() {
+  fresh
+  kit_run render
+  cp "$CON/.claude/rules/kit/a.md" "$T/a.stamped"
+  set_kitjson '.exclude=[".claude/rules/kit/a.md"]'
+  kit_run render
+  is "$RC" 0 "exclude_stamped: excluding an owned dest exits 0"
+  is "$(exact "$CON/.claude/rules/kit/a.md")" "$(exact "$T/a.stamped")" "exclude_stamped: the stamped file stays on disk"
+}
+
+# R10: every scratch dir a kit run makes, the re-exec extract included, is gone after it.
+t_render_no_scratch_left() {
+  fresh
+  local saved="$TMPDIR"
+  mkdir -p "$T/scratch"
+  export TMPDIR="$T/scratch"
+  kit_run render
+  is "$RC" 0 "scratch: render exits 0"
+  is "$(ls -A "$T/scratch")" "" "scratch: a clean render leaves TMPDIR empty"
+  echo "local line" >> "$CON/.claude/rules/kit/a.md"
+  kit_run render
+  is "$RC" 1 "scratch: refused render exits 1"
+  is "$(ls -A "$T/scratch")" "" "scratch: a refused render leaves TMPDIR empty"
+  set_kitjson '.format=2'
+  kit_run render
+  is "$RC" 1 "scratch: CONFIG failure exits 1"
+  is "$(ls -A "$T/scratch")" "" "scratch: a CONFIG failure leaves TMPDIR empty"
+  export TMPDIR="$saved"
+}
+
 t_render_basic
 t_render_idempotent
 t_render_refuses_edit
@@ -246,4 +292,7 @@ t_render_single_pass
 t_render_config_failure
 t_render_bad_lock
 t_render_usage
+t_render_exclude_keeps_own
+t_render_exclude_keeps_stamped
+t_render_no_scratch_left
 done_testing
