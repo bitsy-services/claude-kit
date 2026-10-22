@@ -1,0 +1,1 @@
+{"format":1,"slices":["core","extra"],"params":{"gate":"bash scripts/check.sh"},"exclude":[]}

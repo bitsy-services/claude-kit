@@ -1,0 +1,11 @@
+{
+  "params": {
+    "gate": {"required": true, "pattern": "^[^\"'$`;&|\\n]+$"},
+    "gate_landing": {"default": "{{kit.gate}}", "pattern": "^[^\"'$`;&|\\n]+$"},
+    "memory_root": {"default": ".claude/memory", "pattern": "^[^\"'$`;&|\\n]+$"}
+  },
+  "set": {"autoMemoryEnabled": false},
+  "forbid": [
+    {"entry": "Bash(gh *)", "reason": "broad gh can move origin/main without the push prompt"}
+  ]
+}

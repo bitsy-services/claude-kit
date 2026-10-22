@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# kit: render shared Claude Code config from a vendored kit and check it for drift.
+set -euo pipefail
+
+KIT_SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+for _f in "$KIT_SELF"/lib/*.sh; do
+  [ -e "$_f" ] || continue
+  # shellcheck source=/dev/null
+  . "$_f"
+done
+
+CONSUMER_CMDS="scaffold render check status bump init edit"
+KIT_CMDS="selftest publish"
+
+usage() {
+  echo "usage: kit <command>"
+  echo "  in a consumer repo: ${CONSUMER_CMDS// /, }"
+  echo "  in the kit repo:    ${KIT_CMDS// /, }"
+}
+
+in_list() {
+  local w
+  for w in $2; do [ "$w" = "$1" ] && return 0; done
+  return 1
+}
+
+# Kit mode: this tree has slices/ and is not itself a submodule.
+kit_mode() {
+  [ -d "$KIT_SELF/slices" ] || return 1
+  local sp
+  sp="$(git -C "$KIT_SELF" rev-parse --show-superproject-working-tree 2>/dev/null)" || sp=""
+  [ -z "$sp" ]
+}
+
+run_cmd() {
+  local fn="cmd_${1//-/_}"
+  shift
+  if ! declare -F "$fn" > /dev/null; then
+    echo "internal error: $fn is not defined" >&2
+    exit 2
+  fi
+  "$fn" "$@"
+}
+
+main() {
+  local cmd="${1:-}"
+  if [ -z "$cmd" ]; then usage; exit 2; fi
+  shift
+  if ! in_list "$cmd" "$CONSUMER_CMDS $KIT_CMDS"; then usage; exit 2; fi
+
+  if kit_mode; then
+    if ! in_list "$cmd" "$KIT_CMDS"; then
+      die "not a kit consumer: $cmd runs in a repo that vendors the kit at .claude/vendor/kit"
+    fi
+    run_cmd "$cmd" "$@"
+    return
+  fi
+
+  if ! in_list "$cmd" "$CONSUMER_CMDS"; then
+    die "$cmd runs in the kit repo"
+  fi
+  ctx_consumer
+  local pin
+  pin="$(pin_of)"
+  [ -n "$pin" ] || die "not a kit consumer: $cmd runs in a repo that vendors the kit at .claude/vendor/kit"
+
+  if [ "${KIT_PINNED:-}" != "$pin" ]; then
+    if ! git -C "$VENDOR" cat-file -e "${pin}^{commit}" 2>/dev/null; then
+      echo "NOT PRESENT ${pin:0:7} run: git submodule update --init .claude/vendor/kit"
+      exit 1
+    fi
+    local tmp
+    tmp="$(mktemp -d)"
+    extract "$pin" "$tmp" bin lib
+    KIT_PINNED="$pin" exec bash "$tmp/bin/kit" "$cmd" "$@"
+  fi
+  run_cmd "$cmd" "$@"
+}
+
+main "$@"

@@ -1,0 +1,7 @@
+{
+  "requires": ["core"],
+  "headings": ["Deploy"],
+  "params": {
+    "trunk": {"default": "main", "pattern": "^[^\"'$`;&|\\n]+$"}
+  }
+}

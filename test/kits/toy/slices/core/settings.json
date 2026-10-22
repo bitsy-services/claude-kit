@@ -1,0 +1,8 @@
+{
+  "permissions": {"allow": ["Read", "Bash(echo *)"]},
+  "hooks": {
+    "PreToolUse": [
+      {"matcher": "Bash", "hooks": [{"type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/kit/h.sh\""}]}
+    ]
+  }
+}
