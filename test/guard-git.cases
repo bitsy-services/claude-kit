@@ -1,0 +1,91 @@
+# The trunk-guard battery, read by t-guard-git.sh. One case per line:
+# <HEAD branch>|<DENY or allow>|<the Bash command>. The trunk is main, and
+# the scratch repo has branches main and feature and aliases ci and sh.
+main|DENY|git commit -m x
+main|DENY|git -c user.name=x commit -m x
+main|DENY|git -c alias.ci=commit ci -m x
+main|DENY|git ci -m x
+main|DENY|git sh
+main|DENY|git merge feature
+main|allow|git merge --ff-only feature
+main|DENY|git merge feature && echo --ff-only
+main|DENY|git branch -f main HEAD
+main|DENY|git switch -C main
+main|DENY|git checkout -B main
+main|DENY|git fetch . +feature:main
+main|DENY|git update-ref refs/heads/main HEAD
+main|DENY|git reset --hard HEAD
+main|DENY|git reset feature
+main|allow|git reset -- a.txt
+main|DENY|git -C . commit -m x
+main|DENY|git cherry-pick feature
+main|DENY|git rebase feature
+main|DENY|git pull
+main|allow|git pull --ff-only
+main|allow|git fetch origin main:main
+main|allow|git status
+main|DENY|git branch -D feature
+main|DENY|bash -c "git commit -m x"
+main|DENY|sh -c 'git commit -m x'
+main|DENY|eval git commit -m x
+main|DENY|echo $(git commit -m x)
+main|DENY|echo `git commit -m x`
+main|DENY|(git commit -m x)
+main|DENY|{ git commit -m x; }
+main|DENY|git commit -m x &
+main|DENY|git commit -m "a;b"
+main|DENY|git "commit" --allow-empty -m x
+main|DENY|git 'merge' feature
+main|DENY|git --git-dir .git commit -m x
+main|DENY|git --no-optional-locks commit -m x
+main|DENY|xargs git commit -m x
+main|DENY|env GIT_AUTHOR_NAME=x git commit -m x
+main|DENY|find . -maxdepth 0 -exec git commit -m x ;
+main|DENY|/usr/bin/git commit -m x
+main|allow|git log --oneline -3
+main|allow|git switch -c new-topic && git commit -m x
+feature|allow|git commit -m x
+feature|allow|git rebase main
+feature|allow|git rebase --continue
+feature|allow|git merge main
+feature|allow|git reset --hard HEAD
+feature|DENY|git switch main && git merge feature
+feature|DENY|git switch main; git commit -m x
+feature|allow|git switch main && git merge --ff-only feature
+feature|DENY|git checkout main && git reset --hard feature
+feature|allow|git switch -c new-topic
+feature|allow|git commit -m "fix main menu"
+feature|allow|git log main..feature
+feature|allow|git diff main
+feature|allow|git fetch origin
+feature|allow|git fetch origin main:main
+feature|DENY|git fetch -f . feature:main
+feature|DENY|git fetch --force . feature:main
+feature|DENY|git fetch . feature:main
+feature|DENY|git push . feature:main
+feature|DENY|git push -f origin feature:main
+feature|DENY|git push origin feature:main
+feature|DENY|git push origin HEAD:main
+feature|DENY|git push origin :old-topic
+feature|DENY|git push origin --delete old-topic
+feature|allow|git push -u origin feature
+feature|DENY|git rebase origin/main main
+feature|DENY|git rebase --onto feature feature~0 main
+feature|DENY|git rebase --root main
+feature|allow|git rebase --onto main feature~0 feature
+feature|DENY|git branch -f "main" feature
+feature|DENY|git switch -C 'main' feature
+feature|DENY|git branch -m main trunk-old
+feature|DENY|git branch -d old-topic
+feature|DENY|git branch --delete old-topic
+feature|allow|git branch --show-current
+feature|DENY|git update-ref -d refs/heads/old-topic
+feature|DENY|cd . && git switch main && git commit -m x
+feature|DENY|git -C . switch main && git -C . commit -m x
+feature|allow|git -c core.pager=cat log -1
+feature|DENY|git push origin HEAD:refs/heads/main
+main|DENY|git rebase -i HEAD~1
+main|DENY|git pull --rebase
+main|DENY|command git commit -m x
+main|DENY|exec git commit -m x
+feature|allow|git status
