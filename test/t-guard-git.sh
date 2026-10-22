@@ -63,6 +63,21 @@ t_unrendered() {
   G="$g"
 }
 
+# T14.2: unrendered and without KIT_TRUNK, the guard cannot tell the trunk
+# from a session branch, so it refuses every git command.
+t_unrendered_unset() {
+  local R="$T/unrendered" g="$G" c
+  G="$SRC"
+  for c in "git status" "git switch -c topic && git commit -m x" "ls && git log"; do
+    verdict "$R" "$c"
+    is "$GOT" DENY "unrendered, no KIT_TRUNK: $c is denied"
+    like "$REASON" '^Refusing every git command: this guard has no trunk name' "unrendered, no KIT_TRUNK: the reason for $c"
+  done
+  verdict "$R" "ls -la"
+  is "$GOT" allow "unrendered, no KIT_TRUNK: a command without git passes"
+  G="$g"
+}
+
 # The battery: the scratch repo of the lab's corpus.sh, no kit lock.
 t_battery() {
   local R="$T/repo" h want c bad=0 total=0 n
@@ -121,10 +136,14 @@ t_push_unpublished() {
   git -C "$vendor" checkout -q "$pin"
   git -C "$CON" add .claude/vendor/kit
   git -C "$vendor" update-ref refs/remotes/origin/main "$KIT_HEAD"
+  # R18: a push sends commits, not the index; a pin only staged is not pushed.
+  verdict "$CON" "git push -u origin topic"
+  is "$GOT" allow "push: a pin staged but not committed is not pushed"
+  git -C "$CON" commit -q -m "Bump the kit"
   verdict "$CON" "git push -u origin topic"
   is "$GOT" DENY "push: origin/main behind the pin is denied"
-  is "$REASON" "kit pin $pin7 is not on the kit's origin/main as of the last fetch: publish the kit first, or run kit check --published" \
-    "push: the reason names the pin"
+  is "$REASON" "kit pin $pin7 on topic is not on the kit's origin/main as of the last fetch: publish the kit first, or run kit check --published" \
+    "push: the reason names the pin and the ref"
   verdict "$CON" "git push"
   is "$GOT" DENY "push: a bare git push is denied"
   verdict "$CON" "git status && git push upstream topic"
@@ -146,15 +165,87 @@ t_push_unpublished() {
   is "$REASON" "kit checkout is absent, so the pin cannot be verified: run kit init" \
     "push: the reason says to run kit init"
 
+  # A pushed ref without a gitlink falls back to the index, which has none.
   git -C "$CON" rm -q --cached .claude/vendor/kit
+  git -C "$CON" commit -q -m "Drop the gitlink"
   verdict "$CON" "git push -u origin topic"
-  is "$GOT" DENY "push: a lock without a staged pin is denied"
+  is "$GOT" DENY "push: a lock without a pin is denied"
   like "$REASON" '^no kit pin is staged at \.claude/vendor/kit' "push: the reason says no pin is staged"
+}
+
+# I2/R18: the guard judges what is pushed. The pin comes from each pushed
+# ref, in the repo the push runs in; a repo without a kit lock is not checked;
+# --git-dir and GIT_DIR fall back to the session project's staged gitlink.
+t_push_refs() {
+  local R="$T/refs" U="$T/unrelated" vendor pub unpub
+  mk_consumer "$BASIC" "$R"
+  kit_run render
+  git -C "$R" add -A
+  git -C "$R" commit -q -m "rendered"
+  git -C "$R" branch -m topic main
+  vendor="$R/.claude/vendor/kit"
+  pub="$(git -C "$vendor" rev-parse HEAD)"
+  echo three >> "$T/kit/CHANGELOG.md"
+  git -C "$T/kit" commit -q -am three
+  unpub="$(git -C "$T/kit" rev-parse HEAD)"
+  git -C "$vendor" fetch -q "$T/kit" main
+  git -C "$vendor" update-ref refs/remotes/origin/main "$pub"
+  # preview-x and bump-a pin the unpublished commit; main keeps the published one.
+  git -C "$R" switch -q -c preview-x
+  git -C "$vendor" checkout -q "$unpub"
+  git -C "$R" add .claude/vendor/kit
+  git -C "$R" commit -q -m "Preview the kit"
+  git -C "$R" branch bump-a
+  git -C "$R" switch -q main
+  git -C "$vendor" checkout -q "$pub"
+
+  verdict "$R" "git push origin preview-x"
+  is "$GOT" DENY "refs: pushing preview-x from main is denied"
+  is "$REASON" "kit pin ${unpub:0:7} on preview-x is not on the kit's origin/main as of the last fetch: publish the kit first, or run kit check --published" \
+    "refs: the reason names preview-x's pin"
+  verdict "$R" "git push origin bump-a:bump-a"
+  is "$GOT" DENY "refs: pushing bump-a:bump-a from main is denied"
+  verdict "$R" "git push origin +bump-a:refs/heads/other"
+  is "$GOT" DENY "refs: a forced refspec's source is judged"
+  verdict "$R" "git push origin main preview-x"
+  is "$GOT" DENY "refs: one unpublished ref among several is denied"
+  verdict "$R" "git push --all origin"
+  is "$GOT" DENY "refs: --all judges every branch"
+  verdict "$R" "git switch preview-x && git push"
+  is "$GOT" DENY "refs: the branch switched to before the push is judged"
+  verdict "$R" "git push origin main"
+  is "$GOT" allow "refs: main's published pin may be pushed"
+  verdict "$R" "git push"
+  is "$GOT" allow "refs: a bare push of main may be pushed"
+
+  # Stage the unpublished pin on main: the session project now fails the
+  # index check, which an unrelated repo's push must not inherit.
+  git -C "$vendor" checkout -q "$unpub"
+  git -C "$R" add .claude/vendor/kit
+  mkdir -p "$U"
+  git -C "$U" init -q -b main
+  git -C "$U" commit -q --allow-empty -m init
+  verdict "$R" "git -C $U push origin main"
+  is "$GOT" allow "refs: a push in a repo without a kit lock is not checked"
+  verdict "$R" "cd $U && git push origin main"
+  is "$GOT" allow "refs: the same after cd"
+  verdict "$R" "git push origin main"
+  is "$GOT" allow "refs: main's committed pin is published, whatever is staged"
+  verdict "$R" "git --git-dir=$U/.git push origin main"
+  is "$GOT" DENY "refs: --git-dir falls back to the session project's staged pin"
+  verdict "$R" "git --work-tree $U push origin main"
+  is "$GOT" DENY "refs: --work-tree falls back the same way"
+  verdict "$R" "GIT_DIR=$U/.git git push origin main"
+  is "$GOT" DENY "refs: GIT_DIR falls back the same way"
+  git -C "$vendor" checkout -q "$pub"
+  git -C "$R" add .claude/vendor/kit
 }
 
 t_template
 t_unrendered
+t_unrendered_unset
 t_battery
 t_no_jq
 t_push_unpublished
+t_push_refs
 done_testing

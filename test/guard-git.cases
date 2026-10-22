@@ -89,3 +89,7 @@ main|DENY|git pull --rebase
 main|DENY|command git commit -m x
 main|DENY|exec git commit -m x
 feature|allow|git status
+main|allow|git switch feature && git commit -m x
+main|DENY|git checkout feature -- a.txt && git commit -m x
+main|DENY|git switch no-such-branch && git commit -m x
+feature|DENY|git switch feature && git switch main && git commit -m x
