@@ -9,15 +9,15 @@ Every Claude session contributes through its own development branch. `{{kit.trun
 
 ## Before the first edit of a turn
 
-Run `git branch --show-current` and `git status --porcelain`, then:
+First run `git submodule update --init .claude/vendor/kit`: a branch switch leaves the kit checkout at the old branch's pin, which `git status` would show as uncommitted work. Then run `git branch --show-current` and `git status --porcelain`, and:
 
 | HEAD is | Tree | Do |
 |---|---|---|
 | `{{kit.trunk}}` | clean | `git switch -c <topic>` **now**, before touching any file. Then edit. |
 | `{{kit.trunk}}` | dirty | Stop. Uncommitted work is sitting on `{{kit.trunk}}`. Report the files and ask; do not branch over it, do not commit it. |
 | this session's branch | any | Proceed. |
-| another branch, and this session already has one | clean | Another session switched the checkout. `git switch <ours>`, then proceed. |
-| another branch, and this session already has one | dirty | Stop and report: the dirty files belong to the other session. |
+| a branch other than `{{kit.trunk}}`, and this session already has one | clean | Another session switched the checkout. `git switch <ours>`, then proceed. |
+| a branch other than `{{kit.trunk}}`, and this session already has one | dirty | Stop and report: the dirty files belong to the other session. |
 | a branch other than `{{kit.trunk}}`, and this session has none yet | any | Adopt it as the session branch. Do not create another. |
 
 ## Naming
@@ -28,7 +28,7 @@ Lowercase kebab-case, two to four words naming the work, no prefix, no date; rep
 
 - Commit on the session branch as the work reaches coherent points, and always before the turn ends, so the tree is clean for another session to switch. Subject short and imperative, matching `git log`; body only when the why is not obvious from the diff; end with the attribution trailer the session specifies.
 - Run `{{kit.gate}}` before committing when repo.md § Gate calls for it, and fix any failure first. The gate is never weakened to make a build pass.
-- Never commit on `{{kit.trunk}}`. The PreToolUse hook `.claude/hooks/kit/guard-git.sh` refuses `git commit`, `git cherry-pick`, `git revert`, `git am`, `git rebase`, `git reset` with a mode or to another commit, and any `git merge` or `git pull` without `--ff-only` while HEAD is `{{kit.trunk}}`, and refuses deleting any branch.
+- Never commit on `{{kit.trunk}}`. The PreToolUse hook `.claude/hooks/kit/guard-git.sh` refuses `git commit`, `git cherry-pick`, `git revert`, `git am`, `git rebase`, `git reset` with a mode or to another commit, and any `git merge` or `git pull` without `--ff-only` while HEAD is `{{kit.trunk}}`, and refuses deleting any branch. Aborting or continuing a merge (`git merge --abort`, `git merge --continue`) and aborting or quitting a rebase (`git rebase --abort`, `git rebase --quit`) stay allowed on `{{kit.trunk}}`.
 - Push only when the user asks. Push is not in the allow list, so it prompts; that prompt is the confirmation.
 - Branches are kept after merging. Never delete a branch.
 

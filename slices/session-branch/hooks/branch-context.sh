@@ -18,7 +18,23 @@ git rev-parse --is-inside-work-tree > /dev/null 2>&1 || exit 0
 branch=$(git branch --show-current 2> /dev/null)
 [ -z "$branch" ] && branch="(detached HEAD)"
 
-dirty=$(git status --porcelain 2> /dev/null | wc -l | tr -d ' ')
+# The tree without the kit checkout, and without optional locks, so the hook
+# never rewrites the index under a running session.
+dirty=$(git --no-optional-locks status --porcelain --ignore-submodules=all 2> /dev/null | wc -l | tr -d ' ')
+# The kit pin: one staged but not committed is uncommitted work. A checkout
+# at another commit than the staged pin, as a branch switch leaves it, is not
+# work; it is named on its own, with its fix.
+kit=""
+read -r kmode kpin _ < <(git ls-files -s -- .claude/vendor/kit 2> /dev/null) || true
+if [ "${kmode:-}" = 160000 ]; then
+  hpin=$(git rev-parse -q --verify HEAD:.claude/vendor/kit 2> /dev/null) || hpin=""
+  [ "$hpin" = "$kpin" ] || dirty=$((dirty + 1))
+  # An uninitialised submodule dir has no .git, and git -C would find this repo's.
+  if [ -e .claude/vendor/kit/.git ] && co=$(git -C .claude/vendor/kit rev-parse -q --verify HEAD 2> /dev/null) &&
+    [ "$co" != "$kpin" ]; then
+    kit=", kit checkout off-pin (run: git submodule update --init .claude/vendor/kit)"
+  fi
+fi
 if [ "$dirty" = "0" ]; then tree="clean"; else tree="$dirty uncommitted path(s)"; fi
 
 state=""
@@ -57,7 +73,7 @@ if [ "$has_trunk" = 1 ]; then
       done)
 fi
 
-ctx="Git at session start: on branch '$branch', tree $tree"
+ctx="Git at session start: on branch '$branch', tree $tree$kit"
 [ -n "$state" ] && ctx="$ctx, $state"
 ctx="$ctx."
 [ -n "$trunkpos" ] && ctx="$ctx $trunkpos"

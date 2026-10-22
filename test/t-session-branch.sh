@@ -183,6 +183,73 @@ t_context_without_jq() {
   like "$OUT" 'guard-git\.sh blocks' "no jq: says the guard blocks git commands"
 }
 
+# I1: after a branch switch the kit checkout stays at the old pin. That is
+# reported as an off-pin checkout, not as uncommitted work; a pin staged but
+# not committed is uncommitted work.
+t_context_kit_off_pin() {
+  local vendor="$CON/.claude/vendor/kit" pin
+  pin="$(git -C "$vendor" rev-parse HEAD)"
+  git -C "$CON" add -A
+  git -C "$CON" commit -q -m "rendered"
+  context "$CON"
+  like "$CTX" "on branch 'topic', tree clean\." "kit: a consumer at its pin is clean"
+  unlike "$CTX" 'off-pin' "kit: at its pin, no off-pin line"
+  echo "more" >> "$T/kit/CHANGELOG.md"
+  git -C "$T/kit" commit -q -am "more"
+  git -C "$vendor" fetch -q "$T/kit" main
+  git -C "$vendor" checkout -q FETCH_HEAD
+  context "$CON"
+  like "$CTX" "tree clean, kit checkout off-pin \(run: git submodule update --init \.claude/vendor/kit\)\." \
+    "kit: an off-pin checkout is named, with its fix"
+  unlike "$CTX" 'uncommitted' "kit: an off-pin checkout is not uncommitted work"
+  git -C "$CON" add .claude/vendor/kit
+  context "$CON"
+  like "$CTX" "tree 1 uncommitted path\(s\)\." "kit: a staged pin is uncommitted work"
+  unlike "$CTX" 'off-pin' "kit: a staged pin matching the checkout is not off-pin"
+  git -C "$CON" reset -q -- .claude/vendor/kit
+  git -C "$vendor" checkout -q "$pin"
+}
+
+# M5: the hook's git status takes no optional lock, so it never rewrites the
+# index under a session that is using it.
+t_context_no_index_write() {
+  local before
+  touch -d '2001-01-01' "$CON/CLAUDE.md"
+  before="$(cksum < "$CON/.git/index")"
+  context "$CON"
+  is "$(cksum < "$CON/.git/index")" "$before" "locks: the index is not rewritten"
+}
+
+# before <file> <a> <b>: "before" when the file's first <a> precedes its first <b>.
+before() {
+  local c pa pb
+  c="$(cat "$1" 2> /dev/null)"
+  case "$c" in *"$2"*) ;; *) echo "no $2"; return ;; esac
+  case "$c" in *"$3"*) ;; *) echo "no $3"; return ;; esac
+  pa="${c%%"$2"*}"
+  pb="${c%%"$3"*}"
+  if [ "${#pa}" -lt "${#pb}" ]; then echo before; else echo after; fi
+}
+
+# I1, T11.1, T11.2, T11.4: what the rule and the skills tell Claude to run.
+t_texts() {
+  local rule="$CON/.claude/rules/kit/session-branches.md"
+  local mtm="$CON/.claude/skills/merge-to-main/SKILL.md" swm="$CON/.claude/skills/sync-with-main/SKILL.md"
+  local up='git submodule update --init .claude/vendor/kit'
+  is "$(before "$rule" "$up" 'git status --porcelain')" before "rule: the kit checkout is updated before git status is read"
+  like "$(cat "$mtm")" '^1\. \*\*Where are we\.\*\* `git submodule update --init \.claude/vendor/kit`' \
+    "merge-to-main: step 1 starts with the kit checkout"
+  like "$(cat "$swm")" '^1\. \*\*[^*]+\*\* `git submodule update --init \.claude/vendor/kit`' \
+    "sync-with-main: step 1 starts with the kit checkout"
+  unlike "$(cat "$rule")" '^\| another branch' "rule: no row says another branch"
+  is "$(grep -c '^| a branch other than `master`, and this session already has one |' "$rule")" 2 \
+    "rule: rows 4 and 5 name a branch other than the trunk"
+  like "$(cat "$rule")" 'git merge --abort.*git merge --continue.*git rebase --abort.*git rebase --quit.* stay allowed' \
+    "rule: the guard line says aborting or continuing a merge and aborting or quitting a rebase stay allowed"
+  like "$(sed -n '/^## Do not/,$p' "$swm")" 'git checkout -- <file>.*step 6\.3.s `git checkout <side> -- \.claude/kit\.lock\.json`' \
+    "sync-with-main: the Do-not line excepts step 6.3"
+}
+
 t_guard_trunk
 t_allows
 t_hooks_registered
@@ -196,4 +263,7 @@ t_context_on_trunk
 t_context_on_branch
 t_context_trunk_missing
 t_context_without_jq
+t_texts
+t_context_kit_off_pin
+t_context_no_index_write
 done_testing

@@ -10,7 +10,7 @@ Brings `main` into the session branch so the next `/merge-to-main` is a fast-for
 
 ## Steps
 
-1. **Recover a half-done operation first.**
+1. **Recover a half-done operation first.** `git submodule update --init .claude/vendor/kit` first, so a kit checkout left at another branch's pin does not show as uncommitted work and is not committed as a stale pin. Then:
    - `git rev-parse -q --verify MERGE_HEAD` succeeds: a merge is in progress. On `main` (the user ran `git merge <branch>` there and hit conflicts): `git merge --abort`, `git switch <branch>`, continue at step 2. On the branch (a `git merge main` was started): resolve per steps 5 and 6, then `git commit`; skip to step 8.
    - `git rev-parse -q --verify REBASE_HEAD` succeeds: a rebase is in progress. Resume at step 5.
 2. **Where are we.** On a branch `B` other than `main`, with a clean tree. Uncommitted work: commit it first.
@@ -30,7 +30,7 @@ Brings `main` into the session branch so the next `/merge-to-main` is a fast-for
    2. `git -C .claude/vendor/kit log --oneline <pin1>..<pin2>`, then the same with the pins swapped. A range that lists nothing means its first pin descends from (or is) the second: take that pin and its side. If both ranges list commits, as with two unpublished kit branches, **stop**: show both pins and ask. If the checkout lacks a pin, run `git -C .claude/vendor/kit fetch origin` (it prompts) and retry.
    3. `git checkout <side> -- .claude/kit.lock.json` (it prompts).
    4. `git -C .claude/vendor/kit checkout --detach <pin>` (it prompts), then `git add .claude/vendor/kit`.
-   5. `bash .claude/vendor/kit/bin/kit render --discard`. It writes the rendered files, the lock and the kit's settings entries for the pin, over the conflicted copies.
+   5. `bash .claude/vendor/kit/bin/kit render --discard` (it prompts). It writes the rendered files, the lock and the kit's settings entries for the pin, over the conflicted copies.
    6. `bash .claude/vendor/kit/bin/kit check`, then `git add .claude`.
 7. **Continue.** `git rebase --continue` (or `git commit` for a merge). Repeat from step 5 until it finishes.
 8. **Gate.** `git submodule update --init .claude/vendor/kit`, then `bash scripts/check.sh`. If it fails, fix on B and commit; the sync is not done until it passes. Never weaken the gate to make it pass.
@@ -40,4 +40,4 @@ Brings `main` into the session branch so the next `/merge-to-main` is a fast-for
 
 - No `git push --force`. Merge mode exists so it is never needed.
 - No resolving a conflict by dropping one side's assertion without asking.
-- No `git reset --hard` or `git checkout -- <file>` to escape a conflict. The exits are `git rebase --abort` and `git merge --abort`.
+- No `git reset --hard` or `git checkout -- <file>` to escape a conflict; step 6.3's `git checkout <side> -- .claude/kit.lock.json` is the one exception, since the render in step 6.5 rewrites that lock. The exits are `git rebase --abort` and `git merge --abort`.

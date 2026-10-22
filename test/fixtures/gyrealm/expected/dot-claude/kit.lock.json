@@ -4,7 +4,7 @@
   "files": {
     ".claude/hooks/kit/branch-context.sh": {
       "from": "slices/session-branch/hooks/branch-context.sh",
-      "blob": "3686f98f7d8cd4e3f744a50d3a381403e14f8075"
+      "blob": "2d8f9377f8cf98bde51e7a2e2052a5fd73b072e4"
     },
     ".claude/hooks/kit/guard-git.sh": {
       "from": "slices/session-branch/hooks/guard-git.sh",
@@ -44,7 +44,7 @@
     },
     ".claude/rules/kit/session-branches.md": {
       "from": "slices/session-branch/rules/session-branches.md",
-      "blob": "b6138bb2246ac54f6a995edea2470be637d3ab00"
+      "blob": "0446637743bdbbf4e40d8cadb69d5f96cac30eda"
     },
     ".claude/rules/kit/source-control.md": {
       "from": "slices/core/rules/source-control.md",
@@ -72,11 +72,11 @@
     },
     ".claude/skills/merge-to-main/SKILL.md": {
       "from": "slices/session-branch/skills/merge-to-main/SKILL.md",
-      "blob": "9431d1f06dd59c7c05fb57794db6e8d2a9189a8f"
+      "blob": "016ae8a4b5bb346ed563a186dd2ce02747cc294f"
     },
     ".claude/skills/sync-with-main/SKILL.md": {
       "from": "slices/session-branch/skills/sync-with-main/SKILL.md",
-      "blob": "b64473ea396577e10f3bbe4e6cca5834802708ce"
+      "blob": "76610fd00778e725c39c6e53d626c55ee2fd0302"
     }
   },
   "excluded": {},
