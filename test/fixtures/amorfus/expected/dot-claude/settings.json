@@ -105,7 +105,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "jq -r 'select(.tool_name != \"AskUserQuestion\") | \"- \\(now|strftime(\"%Y-%m-%d\")) | \\(.tool_name)(\\(.tool_input.command // .tool_input.file_path // \"?\")) | fix: | pending\"' >> \"$CLAUDE_PROJECT_DIR/.claude/memory/friction/project-prompt-log.md\" || true"
+            "command": "jq -r 'select(.tool_name != \"AskUserQuestion\") | select((.tool_input.file_path // \"\") | endswith(\"/friction/project-prompt-log.md\") | not) | \"- \\(now|strftime(\"%Y-%m-%d\")) | \\(.tool_name)(\\(.tool_input.command // .tool_input.file_path // \"?\")) | fix: | pending\"' >> \"$CLAUDE_PROJECT_DIR/.claude/memory/friction/project-prompt-log.md\" || true"
           }
         ]
       }

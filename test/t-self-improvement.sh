@@ -60,6 +60,19 @@ t_logger_skips_ask() {
   is "$(cat "$LOG" 2> /dev/null)" "$before" "ask: AskUserQuestion appends nothing"
 }
 
+# R27: a prompt to write the log itself is not logged; no allow entry can
+# cover that protected path, and the line would race the write.
+t_logger_skips_own_log() {
+  local before
+  before="$(cat "$LOG" 2> /dev/null)"
+  log_prompt "{\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"$CON/memory/friction/project-prompt-log.md\"}}"
+  is "$RC" 0 "own log: exits 0"
+  is "$(cat "$LOG" 2> /dev/null)" "$before" "own log: a prompt to write the log appends nothing"
+  log_prompt '{"tool_name":"Write","tool_input":{"file_path":"/x/friction/project-prompt-log.md.bak"}}'
+  is "$(grep -c '' "$LOG" 2> /dev/null)" "$(( $(printf '%s\n' "$before" | grep -c '') + 1 ))" \
+    "own log: another file is still logged"
+}
+
 t_logger_path_with_space() {
   mkdir -p "$T/My Repo/memory/friction"
   log_prompt '{"tool_name":"Write","tool_input":{"file_path":"/x/y.md"}}' "$T/My Repo"
@@ -81,6 +94,7 @@ t_check
 t_logger_target
 t_logger_appends
 t_logger_skips_ask
+t_logger_skips_own_log
 t_logger_path_with_space
 t_logger_without_dir
 done_testing
