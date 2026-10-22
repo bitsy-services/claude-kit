@@ -227,6 +227,16 @@ cmd_render() {
   done
   if [ "$bad" != 0 ]; then return 1; fi
 
+  # R13: an excluded dest whose kit source changed since the old lock.
+  if [ -e "$LOCK" ]; then
+    while IFS=$'\t' read -r d b; do
+      note "$d is excluded; the kit changed its source at $(jq -r '.pin[:7]' "$tmp/lock.json")"
+    done < <(jq -r --slurpfile old "$LOCK" '
+      (($old[0].excluded // {}) | if type == "object" then . else {} end) as $o
+      | .excluded | to_entries | sort_by(.key)[]
+      | select($o[.key] != null and $o[.key] != .value) | "\(.key)\t\(.value)"' "$tmp/lock.json")
+  fi
+
   for d in "${dests[@]}"; do
     if [ "${have[$d]:-}" = "${want[$d]}" ]; then continue; fi
     p="$CON/$d"

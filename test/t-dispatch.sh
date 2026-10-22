@@ -31,16 +31,17 @@ kit_run selftest
 is "$RC" 2 "kit command in consumer mode exits 2"
 like "$OUT" 'selftest runs in the kit repo' "consumer mode names the rule"
 
-# valid command with no implementation yet is an internal error
+# a consumer command runs and exits 0
 kit_run status
-is "$RC" 2 "unimplemented command exits 2"
-like "$OUT" 'internal error: cmd_status' "unimplemented command is reported"
+is "$RC" 0 "status in a consumer exits 0"
+like "$OUT" "^kit [0-9a-f]{7} · files " "status prints its line"
 
 # re-exec at the pin: a commit that moves the submodule HEAD must not change what runs
 git -C "$CON/.claude/vendor/kit" rev-parse HEAD > /dev/null
-echo "# marker" >> "$CON/.claude/vendor/kit/bin/kit"
+echo "echo EDITED_COPY_RAN" >> "$CON/.claude/vendor/kit/bin/kit"
 kit_run status
-like "$OUT" 'internal error: cmd_status' "re-exec runs the pinned bin, not the edited working copy"
+like "$OUT" '^kit [0-9a-f]{7} ' "re-exec runs the pinned bin"
+unlike "$OUT" 'EDITED_COPY_RAN' "re-exec does not run the edited working copy"
 
 # pin not present in the vendor checkout
 git -C "$CON" update-index --cacheinfo "160000,1111111111111111111111111111111111111111,.claude/vendor/kit"
