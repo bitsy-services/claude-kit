@@ -27,10 +27,13 @@ Write none for a misunderstanding cleared up at once and unlikely to recur, or f
 
 ## When
 
-- At the start of a conversation, consolidate: merge any cluster of friction notes that is ready into a pattern, and drain the prompt log.
-- At the end of a substantial conversation, review the friction that occurred and write the notes it warrants.
-- When the user asks to review friction or patterns, consolidate.
+At the end of a substantial conversation, in one batch with any other memory writes, and whenever the user asks to review friction or patterns:
+- write the friction notes the conversation warrants;
+- merge any cluster that is ready into a pattern;
+- drain the prompt log.
 
 ## The prompt log
 
-A hook appends a line for each permission prompt to `{{kit.memory_root}}/friction/project-prompt-log.md`. It is a log, not a friction note: never merge it into a pattern or delete it. To drain it, fill in `fix:` on each `pending` line, with the allow entry proposed for it under `permissions.md` or with why the prompt should stay, then change `pending` to `resolved`.
+A hook appends a line for each permission prompt to `{{kit.memory_root}}/friction/project-prompt-log.md`. It is a working file, not a memory note: no frontmatter, no index line, never merged into a pattern. Draining empties it:
+- Delete every line for a write under `.claude/` at once, and tell the user so in one sentence: no allow entry stops those prompts.
+- For each remaining line, propose the exact allow entry that covers it under `permissions.md`, or none if it should keep prompting, and delete the line once the user has decided.
