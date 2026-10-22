@@ -1,0 +1,188 @@
+{
+  "format": 1,
+  "pin": "PIN",
+  "files": {
+    ".claude/hooks/kit/branch-context.sh": {
+      "from": "slices/session-branch/hooks/branch-context.sh",
+      "blob": "3686f98f7d8cd4e3f744a50d3a381403e14f8075"
+    },
+    ".claude/hooks/kit/guard-git.sh": {
+      "from": "slices/session-branch/hooks/guard-git.sh",
+      "blob": "96ca1317a9a5defbb342414cf658ea27e09ccda9"
+    },
+    ".claude/hooks/kit/guard-write.sh": {
+      "from": "slices/core/hooks/guard-write.sh",
+      "blob": "65290085a26a741cbc85461cd93fabd2cf79de12"
+    },
+    ".claude/hooks/kit/kit-status.sh": {
+      "from": "slices/core/hooks/kit-status.sh",
+      "blob": "853130052ac89aedfedc26bf44619714339bf9fb"
+    },
+    ".claude/rules/kit/collaboration.md": {
+      "from": "slices/core/rules/collaboration.md",
+      "blob": "e73ecaf9e6d0b22ed1baf185b9caea28c8daf44f"
+    },
+    ".claude/rules/kit/irreversible.md": {
+      "from": "slices/core/rules/irreversible.md",
+      "blob": "0f3d8c0c4d9bba297c55db92dcfd5e7173abf6f7"
+    },
+    ".claude/rules/kit/memory.md": {
+      "from": "slices/core/rules/memory.md",
+      "blob": "b2cbceaf4ba8d1299debeffbc96deb54ddf0e92d"
+    },
+    ".claude/rules/kit/permissions.md": {
+      "from": "slices/core/rules/permissions.md",
+      "blob": "a91fe8b41adf57e398cd977c7fe977ce884c7f82"
+    },
+    ".claude/rules/kit/self-improvement.md": {
+      "from": "slices/self-improvement/rules/self-improvement.md",
+      "blob": "2755f46288311269f7abc67abd2c20435fc57206"
+    },
+    ".claude/rules/kit/session-branches.md": {
+      "from": "slices/session-branch/rules/session-branches.md",
+      "blob": "52ad9c18af325ae7bcfa9c602e8c4e07671b435f"
+    },
+    ".claude/rules/kit/source-control.md": {
+      "from": "slices/core/rules/source-control.md",
+      "blob": "e6da89c061108e05ec4ed85a53e88b863251ccdf"
+    },
+    ".claude/rules/kit/tool-use.md": {
+      "from": "slices/core/rules/tool-use.md",
+      "blob": "a314b44c01e69a4b416c1b2451155f450f655151"
+    },
+    ".claude/skills/kit/SKILL.md": {
+      "from": "slices/core/skills/kit/SKILL.md",
+      "blob": "c149d373f5d5cf25f4e8819b8fbf13da26fa4b2e"
+    },
+    ".claude/skills/merge-to-main/SKILL.md": {
+      "from": "slices/session-branch/skills/merge-to-main/SKILL.md",
+      "blob": "34f4da64a90f269af598804114f99cf1ba02a05f"
+    },
+    ".claude/skills/sync-with-main/SKILL.md": {
+      "from": "slices/session-branch/skills/sync-with-main/SKILL.md",
+      "blob": "eba626352054188f2d30dab503081e23c354ff65"
+    }
+  },
+  "excluded": {},
+  "settings": {
+    "kit": {
+      "allow": [
+        "Read",
+        "Edit",
+        "Write",
+        "WebSearch",
+        "WebFetch",
+        "Skill(update-config)",
+        "Skill(update-config:*)",
+        "Skill(fewer-permission-prompts)",
+        "Skill(fewer-permission-prompts:*)",
+        "Skill(kit)",
+        "Bash(git status *)",
+        "Bash(git log *)",
+        "Bash(git diff *)",
+        "Bash(git show *)",
+        "Bash(git ls-files *)",
+        "Bash(git rev-parse *)",
+        "Bash(git rev-list *)",
+        "Bash(git for-each-ref *)",
+        "Bash(git blame *)",
+        "Bash(git merge-base *)",
+        "Bash(git branch --show-current)",
+        "Bash(git branch --list *)",
+        "Bash(git remote -v)",
+        "Bash(git remote get-url *)",
+        "Bash(git submodule status *)",
+        "Bash(git submodule update --init .claude/vendor/kit)",
+        "Bash(git -C .claude/vendor/kit log *)",
+        "Bash(git -C .claude/vendor/kit diff *)",
+        "Bash(git -C .claude/vendor/kit show *)",
+        "Bash(git -C .claude/vendor/kit status *)",
+        "Bash(gh pr view *)",
+        "Bash(gh pr list *)",
+        "Bash(gh pr diff *)",
+        "Bash(gh run view *)",
+        "Bash(gh run list *)",
+        "Bash(gh repo view *)",
+        "Bash(jq *)",
+        "Bash(wc *)",
+        "Bash(sort *)",
+        "Bash(ls *)",
+        "Bash(grep *)",
+        "Bash(echo *)",
+        "Bash(printf *)",
+        "Bash(mkdir *)",
+        "Bash(bash .claude/vendor/kit/bin/kit check *)",
+        "Bash(bash .claude/vendor/kit/bin/kit status *)",
+        "Bash(bash .claude/vendor/kit/bin/kit render *)",
+        "Bash(bash .claude/vendor/kit/bin/kit edit *)",
+        "Bash(npm run check)",
+        "Skill(merge-to-main)",
+        "Skill(sync-with-main)",
+        "Bash(git add *)",
+        "Bash(git switch *)",
+        "Bash(git commit *)",
+        "Bash(git fetch origin)",
+        "Bash(git fetch origin main:main)",
+        "Bash(git merge --ff-only *)",
+        "Bash(git merge main)",
+        "Bash(git merge --abort)",
+        "Bash(git rebase main)",
+        "Bash(git rebase --continue)",
+        "Bash(git rebase --abort)"
+      ],
+      "ask": [],
+      "deny": [],
+      "hooks": [
+        [
+          "PreToolUse",
+          "Edit|Write|NotebookEdit",
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/kit/guard-write.sh\""
+          }
+        ],
+        [
+          "SessionStart",
+          "",
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/kit/kit-status.sh\""
+          }
+        ],
+        [
+          "PermissionRequest",
+          "",
+          {
+            "type": "command",
+            "command": "jq -r 'select(.tool_name != \"AskUserQuestion\") | \"- \\(now|strftime(\"%Y-%m-%d\")) | \\(.tool_name)(\\(.tool_input.command // .tool_input.file_path // \"?\")) | fix: | pending\"' >> \"$CLAUDE_PROJECT_DIR/.claude/memory/friction/project-prompt-log.md\" || true"
+          }
+        ],
+        [
+          "PreToolUse",
+          "Bash",
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/kit/guard-git.sh\""
+          }
+        ],
+        [
+          "SessionStart",
+          "",
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/kit/branch-context.sh\""
+          }
+        ]
+      ]
+    },
+    "adopted": {
+      "allow": [],
+      "ask": [],
+      "deny": [],
+      "hooks": []
+    }
+  },
+  "set": {
+    "autoMemoryEnabled": false
+  }
+}

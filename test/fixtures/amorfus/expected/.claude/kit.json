@@ -1,0 +1,4 @@
+{ "format": 1,
+  "slices": ["core", "self-improvement", "session-branch"],
+  "params": { "gate": "npm run check" },
+  "exclude": [] }

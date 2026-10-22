@@ -268,13 +268,13 @@ check_repo() {
   done < <(jq -r '.headings | to_entries[] | .key as $s | .value[] | "\($s)\t\(.)"' "$CHECK_EXP/config.json")
 }
 
-# _check_links_in <file> <rel>: LINK for each relative link whose target does
-# not exist. Fenced blocks and inline code spans are skipped.
-_check_links_in() {
-  local f="$1" rel="$2" line fence=0 t base
+# md_links <file>: print each relative link target in a Markdown file, one
+# per line, without its #fragment. Fenced blocks, inline code spans, scheme:
+# URLs and anchor-only links are skipped. The kit's links lint uses it too.
+md_links() {
+  local line fence=0 t
   local fence_re='^[[:space:]]*(```|~~~)' span_re='^([^`]*)`[^`]*`(.*)$' link_re='\]\(([^)]*)\)(.*)$'
   local scheme_re='^[A-Za-z][A-Za-z0-9+.-]*:'
-  base="${f%/*}"
   while IFS= read -r line || [ -n "$line" ]; do
     line="${line//$'\r'/}"
     if [[ $line =~ $fence_re ]]; then fence=$((1 - fence)); continue; fi
@@ -289,15 +289,24 @@ _check_links_in() {
       t="${t%>}"
       if [ -z "$t" ] || [[ $t == '#'* ]] || [[ $t =~ $scheme_re ]]; then continue; fi
       t="${t%%#*}"
-      if [ -z "$t" ]; then continue; fi
-      if [[ $t == /* ]]; then
-        if [ -e "$CON${t//%20/ }" ]; then continue; fi
-      elif [ -e "$base/${t//%20/ }" ]; then
-        continue
-      fi
-      check_problem "LINK $rel -> $t"
+      if [ -n "$t" ]; then printf '%s\n' "$t"; fi
     done
-  done < "$f"
+  done < "$1"
+}
+
+# _check_links_in <file> <rel>: LINK for each relative link whose target does
+# not exist.
+_check_links_in() {
+  local f="$1" rel="$2" t base
+  base="${f%/*}"
+  while IFS= read -r t; do
+    if [[ $t == /* ]]; then
+      if [ -e "$CON${t//%20/ }" ]; then continue; fi
+    elif [ -e "$base/${t//%20/ }" ]; then
+      continue
+    fi
+    check_problem "LINK $rel -> $t"
+  done < <(md_links "$f")
 }
 
 # links: relative links in CLAUDE.md and .claude/**/*.md (not the vendored

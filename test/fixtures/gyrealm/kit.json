@@ -1,0 +1,5 @@
+{ "format": 1,
+  "slices": ["core", "self-improvement", "session-branch", "hugo-wiki"],
+  "params": { "gate": "bash scripts/check.sh", "gate_landing": "bash scripts/check.sh --landing",
+              "wiki_dir": "content/wiki" },
+  "exclude": [] }

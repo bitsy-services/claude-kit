@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Read",
+      "Edit",
+      "Write",
+      "WebSearch",
+      "WebFetch",
+      "Bash(git mv *)",
+      "Bash(git format-patch *)",
+      "Bash(python3 *)",
+      "Bash(curl *)",
+      "Bash(tar *)",
+      "Bash(base64 *)",
+      "Bash(xargs *)",
+      "Bash(find *)",
+      "Bash(awk *)",
+      "Bash(ln *)",
+      "Bash(pandoc *)",
+      "Bash(soffice *)",
+      "Bash(fc-list *)",
+      "Bash(xdg-open *)",
+      "Bash(magick *)",
+      "Bash(convert *)",
+      "Bash(rsvg-convert *)"
+    ]
+  }
+}

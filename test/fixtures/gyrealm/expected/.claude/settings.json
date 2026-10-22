@@ -1,0 +1,140 @@
+{
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Read",
+      "Edit",
+      "Write",
+      "WebSearch",
+      "WebFetch",
+      "Skill(update-config)",
+      "Skill(update-config:*)",
+      "Skill(fewer-permission-prompts)",
+      "Skill(fewer-permission-prompts:*)",
+      "Skill(kit)",
+      "Bash(git status *)",
+      "Bash(git log *)",
+      "Bash(git diff *)",
+      "Bash(git show *)",
+      "Bash(git ls-files *)",
+      "Bash(git rev-parse *)",
+      "Bash(git rev-list *)",
+      "Bash(git for-each-ref *)",
+      "Bash(git blame *)",
+      "Bash(git merge-base *)",
+      "Bash(git branch --show-current)",
+      "Bash(git branch --list *)",
+      "Bash(git remote -v)",
+      "Bash(git remote get-url *)",
+      "Bash(git submodule status *)",
+      "Bash(git submodule update --init .claude/vendor/kit)",
+      "Bash(git -C .claude/vendor/kit log *)",
+      "Bash(git -C .claude/vendor/kit diff *)",
+      "Bash(git -C .claude/vendor/kit show *)",
+      "Bash(git -C .claude/vendor/kit status *)",
+      "Bash(gh pr view *)",
+      "Bash(gh pr list *)",
+      "Bash(gh pr diff *)",
+      "Bash(gh run view *)",
+      "Bash(gh run list *)",
+      "Bash(gh repo view *)",
+      "Bash(jq *)",
+      "Bash(wc *)",
+      "Bash(sort *)",
+      "Bash(ls *)",
+      "Bash(grep *)",
+      "Bash(echo *)",
+      "Bash(printf *)",
+      "Bash(mkdir *)",
+      "Bash(bash .claude/vendor/kit/bin/kit check *)",
+      "Bash(bash .claude/vendor/kit/bin/kit status *)",
+      "Bash(bash .claude/vendor/kit/bin/kit render *)",
+      "Bash(bash .claude/vendor/kit/bin/kit edit *)",
+      "Bash(bash scripts/check.sh)",
+      "Bash(bash scripts/check.sh --landing)",
+      "Skill(merge-to-main)",
+      "Skill(sync-with-main)",
+      "Bash(git add *)",
+      "Bash(git switch *)",
+      "Bash(git commit *)",
+      "Bash(git fetch origin)",
+      "Bash(git fetch origin main:main)",
+      "Bash(git merge --ff-only *)",
+      "Bash(git merge main)",
+      "Bash(git merge --abort)",
+      "Bash(git rebase main)",
+      "Bash(git rebase --continue)",
+      "Bash(git rebase --abort)",
+      "Bash(hugo)",
+      "Bash(hugo version)",
+      "Bash(hugo env)",
+      "Bash(hugo --minify *)",
+      "Bash(hugo -D *)",
+      "Bash(hugo server *)",
+      "Bash(git mv *)",
+      "Bash(git format-patch *)",
+      "Bash(python3 *)",
+      "Bash(curl *)",
+      "Bash(tar *)",
+      "Bash(base64 *)",
+      "Bash(xargs *)",
+      "Bash(find *)",
+      "Bash(awk *)",
+      "Bash(ln *)",
+      "Bash(pandoc *)",
+      "Bash(soffice *)",
+      "Bash(fc-list *)",
+      "Bash(xdg-open *)",
+      "Bash(magick *)",
+      "Bash(convert *)",
+      "Bash(rsvg-convert *)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/kit/guard-write.sh\""
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/kit/guard-git.sh\""
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/kit/kit-status.sh\""
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/kit/branch-context.sh\""
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r 'select(.tool_name != \"AskUserQuestion\") | \"- \\(now|strftime(\"%Y-%m-%d\")) | \\(.tool_name)(\\(.tool_input.command // .tool_input.file_path // \"?\")) | fix: | pending\"' >> \"$CLAUDE_PROJECT_DIR/.claude/memory/friction/project-prompt-log.md\" || true"
+          }
+        ]
+      }
+    ]
+  },
+  "autoMemoryEnabled": false
+}
