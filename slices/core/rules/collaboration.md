@@ -10,7 +10,7 @@ Every stop for the user's input costs a round trip.
 
 ## Shape the answer like the question
 
-- The verdict comes in the first sentence. Then only what changes it: one distinction, one trade-off.
+- An answer to a question gives its verdict in the first sentence, unless the user's own instructions set another order (such as evidence before a design proposal). Then only what changes it: one distinction, one trade-off.
 - Size the answer to the question; a quick question gets a quick answer.
 - Follow the question's shape, not the code's structure or the order of the reasoning. Explain a flow as a story: where it starts, where it goes, what needs it.
 - Citations go at the end, never after every clause. Do not narrate process or memory saves.

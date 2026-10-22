@@ -48,6 +48,7 @@
       "Bash(bash .claude/vendor/kit/bin/kit check *)",
       "Bash(bash .claude/vendor/kit/bin/kit status *)",
       "Bash(bash .claude/vendor/kit/bin/kit render *)",
+      "Bash(bash .claude/vendor/kit/bin/kit edit *)",
       "Bash({{kit.gate}})",
       "Bash({{kit.gate_landing}})"
     ]

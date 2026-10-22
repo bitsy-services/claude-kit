@@ -39,6 +39,12 @@ t_core_gate_allowed_once() {
     "gate: gate and gate_landing give one allow entry"
 }
 
+# guard-write's deny tells Claude to run kit edit, which only prints.
+t_core_kit_edit_allowed() {
+  is "$(jq '.permissions.allow | index("Bash(bash .claude/vendor/kit/bin/kit edit *)") != null' "$CON/.claude/settings.json")" true \
+    "allow: kit edit is allowed"
+}
+
 t_core_check() {
   kit_run check
   is "$RC" 0 "check: kit check exits 0"
@@ -69,6 +75,7 @@ t_kit_status_hook_without_checkout() {
 
 t_core_rules
 t_core_gate_allowed_once
+t_core_kit_edit_allowed
 t_core_check
 t_kit_status_hook
 t_kit_status_hook_without_jq

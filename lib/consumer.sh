@@ -117,8 +117,8 @@ cmd_edit() {
   fi
   say "$dest is rendered from $from at ${pin:0:7}."
   cat <<'STEPS'
-2. Claude states the change and why. A kit change reaches every consumer, so Paul confirms first, as for any rules change.
-3. In the standalone clone: `git -C ~/git/bitsy-services/claude-kit switch -c <topic>`, edit the slice, add a CHANGELOG line, run `bin/kit selftest`, and commit on the topic branch. Writes outside the consumer prompt unless Paul runs `/add-dir` for the clone.
+2. Claude states the change and why. A kit change reaches every consumer, so the user confirms first, as for any rules change.
+3. In the standalone clone: `git -C ~/git/bitsy-services/claude-kit switch -c <topic>`, edit the slice, add a CHANGELOG line, run `bin/kit selftest`, and commit on the topic branch. Writes outside the consumer prompt unless the user runs `/add-dir` for the clone.
 4. Optional preview: `kit bump --from ~/git/bitsy-services/claude-kit <topic>` on the consumer's session branch. Landing stays `UNPUBLISHED`, and a push of that branch aborts under `push.recurseSubmodules=check`.
 5. `kit publish` in the clone. It prompts, and the prompt is the review.
 6. `kit bump` in the consumer to the published sha, then commit and land. A fast-forward of kit `main` keeps the sha, so a preview needs no re-bump.
