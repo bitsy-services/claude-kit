@@ -41,6 +41,7 @@ Clone with the submodule, then run `kit init` in the clone, since `push.recurseS
 
 ```sh
 git clone --recurse-submodules <repo-url>
+cd <repo>
 bash .claude/vendor/kit/bin/kit init
 ```
 
