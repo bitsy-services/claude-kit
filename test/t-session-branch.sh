@@ -151,7 +151,7 @@ t_repo_lacks_gate() {
   printf '## Deploy\n\nA push deploys.\n\n## Conflict stops\n\nConfig.\n\n## Branch names\n\n`a-b`\n' > "$md"
   kit_run check
   is "$RC" 1 "repo: check exits 1"
-  like "$OUT" '^REPO repo\.md lacks ## Gate \(session-branch\)$' "repo: the missing Gate heading is named"
+  like "$OUT" '^REPO repo\.md lacks ## Gate \(session-branch\): run kit apply$' "repo: the missing Gate heading is named"
   cp "$T/repo.bak" "$md"
 }
 

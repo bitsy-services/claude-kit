@@ -220,6 +220,64 @@ t_param_loose_pattern() {
   planted "param-pattern loose" "LINT param-pattern slices/hugo-wiki/slice.json: wiki_dir's pattern accepts \"|\""
 }
 
+t_init_keys_detect() {
+  fresh
+  json_edit "$K/slices/hugo-wiki/slice.json" '.detect = ["../themes"]'
+  planted "init-keys detect" 'LINT init-keys slices/hugo-wiki/slice.json: detect must be a non-empty list of relative paths'
+}
+
+t_init_keys_unknown() {
+  fresh
+  json_edit "$K/slices/session-branch/slice.json" '.params.trunk.init = "guess"'
+  planted "init-keys unknown" 'LINT init-keys slices/session-branch/slice.json: trunk names an unknown init detector "guess"'
+}
+
+t_init_keys_beside() {
+  fresh
+  json_edit "$K/slices/hugo-wiki/slice.json" 'del(.detect)'
+  planted "init-keys beside" 'LINT init-keys slices/hugo-wiki/slice.json: wiki_dir uses beside_detect, but the slice has no detect'
+}
+
+t_init_keys_default() {
+  fresh
+  json_edit "$K/slices/session-branch/slice.json" 'del(.params.trunk.default)'
+  planted "init-keys default" 'LINT init-keys slices/session-branch/slice.json: trunk uses default_branch, which needs a default'
+}
+
+t_headings_file() {
+  fresh
+  rm "$K/slices/session-branch/repo.md"
+  planted "headings file" \
+    'LINT headings slices/session-branch/slice.json: declares headings, but slices/session-branch/repo.md is missing'
+}
+
+t_headings_text() {
+  fresh
+  printf '## Deploy\n\nText.\n\n## Gate\n\n## Conflict stops\n\nText.\n\n## Branch names\n\n`a-b`\n' \
+    > "$K/slices/session-branch/repo.md"
+  planted "headings text" 'LINT headings slices/session-branch/repo.md: ## Gate has no default text'
+}
+
+t_headings_extra() {
+  fresh
+  printf '\n## Extra\n\nText.\n' >> "$K/slices/session-branch/repo.md"
+  planted "headings extra" 'LINT headings slices/session-branch/repo.md: line 17: ## Extra is not a heading the slice declares'
+}
+
+t_headings_param() {
+  fresh
+  printf '## Deploy\n\nA push of {{kit.trunk}} deploys.\n\n## Gate\n\nText.\n\n## Conflict stops\n\nText.\n\n## Branch names\n\n`a-b`\n' \
+    > "$K/slices/session-branch/repo.md"
+  planted "headings param" \
+    'LINT headings slices/session-branch/repo.md: line 3: a param here would not follow a later change of it; name the value instead'
+}
+
+t_headings_undeclared() {
+  fresh
+  printf '## Deploy\n\nText.\n' > "$K/slices/hugo-wiki/repo.md"
+  planted "headings undeclared" 'LINT headings slices/hugo-wiki/repo.md: the slice declares no headings'
+}
+
 t_gitmodules() {
   fresh
   : > "$K/.gitmodules"
@@ -372,6 +430,15 @@ t_core_budget
 t_undeclared_param
 t_param_no_pattern
 t_param_loose_pattern
+t_init_keys_detect
+t_init_keys_unknown
+t_init_keys_beside
+t_init_keys_default
+t_headings_file
+t_headings_text
+t_headings_extra
+t_headings_param
+t_headings_undeclared
 t_gitmodules
 t_rm_r
 t_rm_r_later_option

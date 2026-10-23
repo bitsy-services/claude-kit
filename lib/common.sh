@@ -28,7 +28,84 @@ pin_of() {
   if [ "${mode:-}" = 160000 ]; then printf '%s\n' "$sha"; fi
 }
 
-blob_of() { git hash-object -- "$1"; }
+# blob_of <file>: the blob id of the file's bytes as they are. No
+# .gitattributes filter or eol conversion runs, which would hide a CRLF
+# copy of a rendered file.
+blob_of() { git hash-object --no-filters -- "$1"; }
+
+# The gate kit init writes when it finds no check command in the repo.
+KIT_GATE_FALLBACK="bash .claude/vendor/kit/bin/kit check"
+
+# has_pages <dir>: the consumer has a Markdown page under <dir>, tracked
+# (in a submodule too) or untracked and not ignored, other than a section
+# index (_index.md, or _index.<lang>.md).
+has_pages() {
+  local f
+  [ -n "$1" ] || return 1
+  while IFS= read -r -d '' f; do
+    case "$f" in
+      _index.md | */_index.md | _index.*.md | */_index.*.md) ;;
+      *.md) return 0 ;;
+    esac
+  done < <(
+    git -C "$CON" --literal-pathspecs ls-files -z -co --exclude-standard -- "$1" 2> /dev/null
+    git -C "$CON" --literal-pathspecs ls-files -z --recurse-submodules -c -- "$1" 2> /dev/null
+  )
+  return 1
+}
+
+# md_section <file> <heading>: the state of "## <heading>" in a Markdown
+# file: "absent", or "empty <n>" or "ok <n>", where <n> is the heading's
+# line. The body runs to the next heading of level 1 or 2; CR is ignored.
+md_section() {
+  local line n=0 at=0 st=absent
+  if [ -f "$1" ]; then
+    while IFS= read -r line || [ -n "$line" ]; do
+      n=$((n + 1))
+      line="${line//$'\r'/}"
+      if [ "$st" = absent ]; then
+        line="${line%"${line##*[![:space:]]}"}"
+        if [ "$line" = "## $2" ]; then
+          st=empty
+          at=$n
+        fi
+      elif [[ $line =~ ^#{1,2}[[:space:]] ]]; then
+        break
+      elif [[ $line =~ [^[:space:]] ]]; then
+        st=ok
+        break
+      fi
+    done < "$1"
+  fi
+  if [ "$st" = absent ]; then echo absent; else echo "$st $at"; fi
+}
+
+# md_section_body <file> <heading>: the body of "## <heading>", as
+# md_section bounds it, without CR and without blank lines at either end.
+md_section_body() {
+  local line t in=0 i first=-1 last=-1
+  local -a body=()
+  [ -f "$1" ] || return 0
+  while IFS= read -r line || [ -n "$line" ]; do
+    line="${line//$'\r'/}"
+    if [ "$in" = 0 ]; then
+      t="${line%"${line##*[![:space:]]}"}"
+      if [ "$t" = "## $2" ]; then in=1; fi
+    elif [[ $line =~ ^#{1,2}[[:space:]] ]]; then
+      break
+    else
+      body+=("$line")
+    fi
+  done < "$1"
+  for i in "${!body[@]}"; do
+    if [[ ${body[$i]} =~ [^[:space:]] ]]; then
+      if [ "$first" = -1 ]; then first=$i; fi
+      last=$i
+    fi
+  done
+  if [ "$first" = -1 ]; then return 0; fi
+  printf '%s\n' "${body[@]:first:last-first+1}"
+}
 
 # Scratch directories are made only by scratch_new and removed only by
 # scratch_cleanup, which runs from one EXIT trap. rm never recurses in bin/ or lib/.

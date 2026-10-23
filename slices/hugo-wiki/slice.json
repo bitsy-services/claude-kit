@@ -1,7 +1,8 @@
 {
   "requires": ["core"],
+  "detect": ["themes/hugo-book"],
   "params": {
-    "wiki_dir": {"default": "content", "pattern": "^[A-Za-z0-9._/-]+$"}
+    "wiki_dir": {"default": "content", "pattern": "^[A-Za-z0-9._/-]+$", "init": "beside_detect"}
   },
   "forbid": [
     {"entry": "Bash(hugo *)", "reason": "broad hugo pre-approves hugo deploy, which uploads the built site to a remote target"},

@@ -265,37 +265,17 @@ check_memory() {
       if [ "$line" = "$want" ]; then return 0; fi
     done < "$CON/CLAUDE.md"
   fi
-  check_problem "MEMORY CLAUDE.md does not import $want"
-}
-
-# _check_heading <heading>: print absent, empty or ok for "## <heading>" in
-# repo.md. The body runs to the next heading of level 1 or 2.
-_check_heading() {
-  local line st=absent
-  if [ ! -f "$REPO_MD" ]; then echo absent; return 0; fi
-  while IFS= read -r line || [ -n "$line" ]; do
-    line="${line//$'\r'/}"
-    if [ "$st" = absent ]; then
-      line="${line%"${line##*[![:space:]]}"}"
-      if [ "$line" = "## $1" ]; then st=empty; fi
-    elif [[ $line =~ ^#{1,2}[[:space:]] ]]; then
-      break
-    elif [[ $line =~ [^[:space:]] ]]; then
-      st=ok
-      break
-    fi
-  done < "$REPO_MD"
-  echo "$st"
+  check_problem "MEMORY CLAUDE.md does not import $want: run kit apply"
 }
 
 # repo.md: every heading an enabled slice declares is present and not empty.
 check_repo() {
   local s h st
   while IFS=$'\t' read -r s h; do
-    st="$(_check_heading "$h")"
+    st="$(md_section "$REPO_MD" "$h")"
     case "$st" in
-      absent) check_problem "REPO repo.md lacks ## $h ($s)" ;;
-      empty) check_problem "REPO repo.md ## $h is empty ($s)" ;;
+      absent) check_problem "REPO repo.md lacks ## $h ($s): run kit apply" ;;
+      empty*) check_problem "REPO repo.md ## $h is empty ($s): run kit apply" ;;
     esac
   done < <(jq -r '.headings | to_entries[] | .key as $s | .value[] | "\($s)\t\(.)"' "$CHECK_EXP/config.json")
 }
@@ -356,6 +336,56 @@ check_dangling() {
     check_problem "DANGLING ${f#"$CON"/}"
   done < <(find "$CON/.claude" -path "$CON/.claude/vendor" -prune -o -xtype l -print0 2> /dev/null \
       | LC_ALL=C sort -z)
+}
+
+# gate: a notice while gate or gate_landing is the fallback kit init writes
+# when it finds no check command, since that checks none of the repo's own
+# files.
+check_gate() {
+  local p v
+  for p in gate gate_landing; do
+    v="$(jq -r --arg p "$p" '.params[$p] // empty' "$CHECK_EXP/config.json")"
+    if [ "$v" = "$KIT_GATE_FALLBACK" ]; then
+      check_notice "$p is kit check, which checks only the kit's own files: set \"$p\" in .claude/kit.json to this repo's own check"
+      return 0
+    fi
+  done
+}
+
+# pages: a notice while a param that kit init fills beside a detected folder
+# (init beside_detect) names a folder that holds no pages, as init's own
+# notice said.
+check_pages() {
+  local s p v
+  local -A seen=()
+  while IFS= read -r s; do
+    while IFS= read -r p; do
+      if [ -n "${seen[$p]+x}" ]; then continue; fi
+      seen[$p]=1
+      v="$(jq -r --arg p "$p" '.params[$p] // empty' "$CHECK_EXP/config.json")"
+      if [ -n "$v" ] && ! has_pages "$v"; then
+        check_notice "$p is $v, which holds no pages besides _index.md: set \"$p\" in .claude/kit.json to the folder that holds them"
+      fi
+    done < <(jq -r '(.params // {}) | to_entries[] | select(.value.init? == "beside_detect") | .key' \
+      "$CHECK_EXP/tree/slices/$s/slice.json" 2> /dev/null)
+  done < <(jq -r '.slices[]' "$CHECK_EXP/config.json")
+}
+
+# ignored: git ignores none of the kit's files, since an ignored file is
+# never committed and every other clone would lack it.
+check_ignored() {
+  local -a paths=(.claude/vendor/kit .claude/kit.json .claude/kit.lock.json .claude/settings.json .claude/rules/repo.md)
+  local d first="" n=0 more=""
+  if [ -n "$CHECK_EXP" ]; then
+    while IFS= read -r d; do paths+=("$d"); done < <(jq -r '.files | keys[]' "$CHECK_EXP/lock.json")
+  fi
+  while IFS= read -r d; do
+    if [ -z "$first" ]; then first="$d"; fi
+    n=$((n + 1))
+  done < <(git -C "$CON" check-ignore --no-index -- "${paths[@]}" 2> /dev/null)
+  if [ "$n" = 0 ]; then return 0; fi
+  if [ "$n" -gt 1 ]; then more=" and $((n - 1)) more of the kit's files"; fi
+  check_problem "IGNORED .gitignore ignores $first$more, which must be committed: git check-ignore -v --no-index $first names the line"
 }
 
 # eol: a rendered hook has no CRLF line endings.
@@ -449,10 +479,13 @@ cmd_check() {
     check_set
     check_memory
     check_repo
+    check_gate
+    check_pages
   fi
   check_links
   check_dangling
   if [ -n "$CHECK_EXP" ]; then check_eol; fi
+  check_ignored
   check_url
   check_clone
   check_published

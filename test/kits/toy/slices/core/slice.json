@@ -1,8 +1,8 @@
 {
   "params": {
-    "gate": {"required": true, "pattern": "^[^\"'$`;&|\\n]+$"},
+    "gate": {"required": true, "pattern": "^[^\"'$`;&|\\n]+$", "init": "check_command"},
     "gate_landing": {"default": "{{kit.gate}}", "pattern": "^[^\"'$`;&|\\n]+$"},
-    "memory_root": {"default": ".claude/memory", "pattern": "^[^\"'$`;&|\\n]+$"}
+    "memory_root": {"default": ".claude/memory", "pattern": "^[^\"'$`;&|\\n]+$", "init": "memory_import"}
   },
   "set": {"autoMemoryEnabled": false},
   "forbid": [

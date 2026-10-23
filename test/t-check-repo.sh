@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # kit check, consumer content: settings, forbid, breadth, set, memory,
-# repo.md, links, dangling, eol, url, jq, clone and published rows.
+# repo.md, links, dangling, eol, ignored, url, jq, gate, clone and published
+# rows.
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 t_setup
 # Keep every scratch dir the kit makes inside $T, which the harness removes.
@@ -139,7 +140,7 @@ t_memory() {
   rendered
   : > "$CON/CLAUDE.md"
   kit_run check
-  only "memory" "MEMORY CLAUDE.md does not import @.claude/memory/MEMORY.md"
+  only "memory" "MEMORY CLAUDE.md does not import @.claude/memory/MEMORY.md: run kit apply"
   printf 'Notes.\n   @.claude/memory/MEMORY.md  \r\n' > "$CON/CLAUDE.md"
   kit_run check
   is "$RC" 0 "memory: a trimmed line equal to the import passes"
@@ -149,10 +150,10 @@ t_repo() {
   rendered
   : > "$CON/.claude/rules/repo.md"
   kit_run check
-  only "repo lacks" "REPO repo.md lacks ## Deploy (extra)"
+  only "repo lacks" "REPO repo.md lacks ## Deploy (extra): run kit apply"
   printf '## Deploy\n\n## Other\n\ntext\n' > "$CON/.claude/rules/repo.md"
   kit_run check
-  only "repo empty" "REPO repo.md ## Deploy is empty (extra)"
+  only "repo empty" "REPO repo.md ## Deploy is empty (extra): run kit apply"
   printf '## Deploy\n\n### Sub\n\ntext\n' > "$CON/.claude/rules/repo.md"
   kit_run check
   is "$RC" 0 "repo: a body under a subheading counts"
@@ -243,6 +244,40 @@ t_published() {
   only "published unreachable" "UNPUBLISHED cannot reach the kit's origin to verify $p7"
 }
 
+# ignored: a .gitignore line that covers the kit's files fails the check;
+# one for files the kit does not own does not.
+t_ignored() {
+  rendered
+  echo '.claude/' > "$CON/.gitignore"
+  kit_run check
+  is "$RC" 1 "ignored: check exits 1"
+  like "$OUT" "^IGNORED \.gitignore ignores \.claude/vendor/kit and [0-9]+ more of the kit's files, which must be committed: git check-ignore -v --no-index \.claude/vendor/kit names the line$" \
+    "ignored: the IGNORED line"
+  echo '.claude/settings.local.json' > "$CON/.gitignore"
+  kit_run check
+  is "$RC" 0 "ignored: ignoring settings.local.json is fine"
+}
+
+# gate: while gate or gate_landing is the fallback kit init writes, check
+# repeats a notice, which does not fail it.
+t_gate_notice() {
+  rendered
+  jq -c '.params.gate = "bash .claude/vendor/kit/bin/kit check"' "$CON/.claude/kit.json" > "$T/k.json"
+  cp "$T/k.json" "$CON/.claude/kit.json"
+  kit_run render
+  kit_run check
+  is "$RC" 0 "gate: the fallback gate exits 0"
+  has_line "$OUT" "NOTICE gate is kit check, which checks only the kit's own files: set \"gate\" in .claude/kit.json to this repo's own check" \
+    "gate: the NOTICE line"
+  jq -c '.params.gate = "bash scripts/check.sh" | .params.gate_landing = "bash .claude/vendor/kit/bin/kit check"' \
+    "$CON/.claude/kit.json" > "$T/k.json"
+  cp "$T/k.json" "$CON/.claude/kit.json"
+  kit_run render
+  kit_run check
+  has_line "$OUT" "NOTICE gate_landing is kit check, which checks only the kit's own files: set \"gate_landing\" in .claude/kit.json to this repo's own check" \
+    "gate: the NOTICE names gate_landing when only it is the fallback"
+}
+
 t_clone() {
   rendered
   git -C "$CON" config --unset push.recurseSubmodules
@@ -268,5 +303,7 @@ t_eol
 t_url
 t_need_jq
 t_published
+t_ignored
+t_gate_notice
 t_clone
 done_testing

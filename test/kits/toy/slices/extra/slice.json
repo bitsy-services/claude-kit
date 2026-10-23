@@ -2,6 +2,6 @@
   "requires": ["core"],
   "headings": ["Deploy"],
   "params": {
-    "trunk": {"default": "main", "pattern": "^[^\"'$`;&|\\n]+$"}
+    "trunk": {"default": "main", "pattern": "^[^\"'$`;&|\\n]+$", "init": "default_branch"}
   }
 }

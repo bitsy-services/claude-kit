@@ -53,6 +53,26 @@ _KD_PATTERN_JQ='
        | if length > 0 then "\($k)\($apos)s pattern accepts \(join(" "))" else empty end
   end'
 
+# A slice's detect is a non-empty list of relative paths. A param's init
+# names a detector kit init has: beside_detect needs the slice's detect, and
+# every detector but check_command needs a default to compare with.
+_KD_INIT_JQ='
+def relpath: type == "string" and test("^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$")
+             and (split("/") | all(. != "." and . != ".."));
+. as $root
+| (if has("detect") and ((.detect | type == "array" and length > 0 and all(.[]; relpath)) | not)
+   then "detect must be a non-empty list of relative paths" else empty end),
+  ((.params // {}) | if type == "object" then to_entries[] else empty end
+   | select(.value | type == "object" and has("init"))
+   | .key as $k | .value as $v
+   | if ($v.init | IN("check_command", "default_branch", "beside_detect", "memory_import") | not)
+       then "\($k) names an unknown init detector \($v.init | tojson)"
+     elif $v.init == "beside_detect" and ($root | has("detect") | not)
+       then "\($k) uses beside_detect, but the slice has no detect"
+     elif $v.init != "check_command" and ($v.default | type) != "string"
+       then "\($k) uses \($v.init), which needs a default"
+     else empty end)'
+
 # _lint <name> <file> <detail>: print one LINT line and count it.
 _lint() {
   printf 'LINT %s %s: %s\n' "$1" "$2" "$3"
@@ -472,6 +492,65 @@ _lint_param_pattern() {
   done
 }
 
+# init-keys: each slice.json's detect and init keys, as _KD_INIT_JQ reads them.
+_lint_init_keys() {
+  local f line
+  for f in "${KD_FILES[@]}"; do
+    case "$f" in slices/*/*/*) continue ;; slices/*/slice.json) ;; *) continue ;; esac
+    jq -e 'type == "object"' "$KD_ROOT/$f" > /dev/null 2>&1 || continue
+    while IFS= read -r line; do
+      _lint init-keys "$f" "$line"
+    done < <(jq -r "$_KD_INIT_JQ" "$KD_ROOT/$f" 2> /dev/null)
+  done
+}
+
+# headings: a slice that declares repo.md headings gives each one default
+# text in slices/<slice>/repo.md, which kit apply writes into a repo that
+# lacks the section. That file holds no other ## heading, and no
+# {{kit.<name>}}: a value written into the repo's own text would not follow
+# a later change of the param.
+_lint_headings() {
+  local s f t h line n
+  local -a hs=()
+  local -A want=()
+  for s in "${KD_SLICES[@]}"; do
+    if [ -n "${KD_BAD[$s]+x}" ]; then continue; fi
+    f="slices/$s/slice.json"
+    t="slices/$s/repo.md"
+    hs=()
+    if [ -f "$KD_ROOT/$f" ]; then
+      mapfile -t hs < <(jq -r '(.headings // []) | if type == "array" then .[] | strings else empty end' "$KD_ROOT/$f" 2> /dev/null)
+    fi
+    if [ ! -f "$KD_ROOT/$t" ]; then
+      if [ "${#hs[@]}" -gt 0 ]; then _lint headings "$f" "declares headings, but $t is missing"; fi
+      continue
+    fi
+    if [ "${#hs[@]}" = 0 ]; then
+      _lint headings "$t" "the slice declares no headings"
+      continue
+    fi
+    want=()
+    for h in "${hs[@]}"; do
+      want[$h]=1
+      case "$(md_section "$KD_ROOT/$t" "$h")" in
+        ok*) ;;
+        *) _lint headings "$t" "## $h has no default text" ;;
+      esac
+    done
+    n=0
+    while IFS= read -r line || [ -n "$line" ]; do
+      n=$((n + 1))
+      line="${line//$'\r'/}"
+      if [[ $line =~ ^##[[:space:]]+(.*[^[:space:]])[[:space:]]*$ ]] && [ -z "${want[${BASH_REMATCH[1]}]+x}" ]; then
+        _lint headings "$t" "line $n: ## ${BASH_REMATCH[1]} is not a heading the slice declares"
+      fi
+      if [[ $line == *'{{kit.'* ]]; then
+        _lint headings "$t" "line $n: a param here would not follow a later change of it; name the value instead"
+      fi
+    done < "$KD_ROOT/$t"
+  done
+}
+
 # gitmodules: the kit has no submodules (consumers clone it as one).
 _lint_gitmodules() {
   if [ -e "$KD_ROOT/.gitmodules" ]; then
@@ -548,6 +627,8 @@ selftest_lints() {
   _lint_core_budget
   _lint_undeclared_param
   _lint_param_pattern
+  _lint_init_keys
+  _lint_headings
   _lint_gitmodules
   _lint_rm_r
   _lint_instruction_source

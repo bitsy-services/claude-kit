@@ -6,7 +6,7 @@ description: Use when checking the shared Claude kit's state, bumping it, or cha
 
 # The kit
 
-This repo vendors a shared kit of Claude Code configuration at `.claude/vendor/kit`, pinned by the submodule's commit. `kit render` writes the slices named in `.claude/kit.json` into `.claude/` as stamped copies, merges their entries into `.claude/settings.json` and records what it wrote in `.claude/kit.lock.json`. `kit check` fails on any difference from the pin. Run every command below as its own Bash call, from the repo root.
+This repo vendors a shared kit of Claude Code configuration at `.claude/vendor/kit`, pinned by the submodule's commit. `kit render` writes the slices named in `.claude/kit.json` into `.claude/` as stamped copies, merges their entries into `.claude/settings.json` and records what it wrote in `.claude/kit.lock.json`. `kit check` fails on any difference from the pin. `kit apply` first creates what is missing (repo.md sections with the slices' default text, the memory index and the CLAUDE.md line that imports it), then renders and checks. Run every command below as its own Bash call, from the repo root.
 
 ## Status
 
@@ -20,13 +20,14 @@ On the session branch, each step its own call:
 
 1. `bash .claude/vendor/kit/bin/kit bump` fetches the kit, moves the pin to the kit's published `main`, renders, and prints the CHANGELOG lines between the two pins. It prompts, and that prompt is the review. If the render fails, it prints those lines, then restores the old pin.
 2. Read those CHANGELOG lines. When a `BREAKING:` entry names an edit to `.claude/kit.json` or `.claude/rules/repo.md`, make that edit first, then run `kit bump` (again, if step 1 failed on it). `kit check` fails between the two steps, and that is expected: the edit is for the new pin.
-3. Run the gate: `bash scripts/check.sh`.
-4. `git add .claude`
-5. `git commit -m "Bump kit to <sha7>: <headline>"`
+3. `bash .claude/vendor/kit/bin/kit apply` adds what the new pin needs and ends with the check.
+4. Run the gate: `bash scripts/check.sh`.
+5. `git add .claude CLAUDE.md .gitattributes .claude/memory`
+6. `git commit -m "Bump kit to <sha7>: <headline>"`
 
-If this repo's rules leave commits to the user, stop before step 4 and report. Changed rules and skills load only in a new session.
+If this repo's rules leave commits to the user, stop before step 5 and report. Changed rules and skills load only in a new session.
 
-If step 1 stops with `bump: cannot stage the gitlink`, `.gitignore` ignores `.claude/vendor/kit`, most often through an unanchored `vendor/` line: anchor it as `/vendor/` and run the bump again.
+If step 1 stops with `bump: cannot stage the gitlink`, `.gitignore` ignores `.claude/vendor/kit`, most often through an unanchored `vendor/` line: add the line `!/.claude/vendor/` below it, which keeps other `vendor/` folders ignored, and run the bump again.
 
 ## Change a rendered file
 
@@ -38,4 +39,4 @@ A rendered file carries a stamp naming its source, and the write guard refuses e
 4. `bash bin/kit publish` in the clone lands the change on the kit's `main`. It prompts, and that prompt is the review.
 5. Back in this repo, bump as above.
 
-To keep this repo different instead, exclude the kit's item in `.claude/kit.json`, then run `bash .claude/vendor/kit/bin/kit render`: a file by its path (`.claude/rules/kit/<name>.md`), a settings entry as `allow:<entry>`, a scalar as `set:<key>`. A replacement file goes at the same path, without the stamp. A forbidden entry cannot be excluded.
+To keep this repo different instead, exclude the kit's item in `.claude/kit.json`, then run `bash .claude/vendor/kit/bin/kit apply`: a file by its path (`.claude/rules/kit/<name>.md`), a settings entry as `allow:<entry>`, a scalar as `set:<key>`. Delete the kit's copy of an excluded file, or put a replacement at the same path, without the stamp. A forbidden entry cannot be excluded.

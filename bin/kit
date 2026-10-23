@@ -10,7 +10,7 @@ for _f in "$KIT_SELF"/lib/*.sh; do
   . "$_f"
 done
 
-CONSUMER_CMDS="scaffold render check status bump init edit"
+CONSUMER_CMDS="init apply scaffold render check status bump edit"
 KIT_CMDS="selftest publish"
 
 usage() {

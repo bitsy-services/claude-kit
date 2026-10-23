@@ -16,7 +16,7 @@ description: Use when a session branch is ready to land on main — the user say
 4. **Gate.** `git submodule update --init .claude/vendor/kit`, so the kit checkout matches the branch's pin, then `npm run check`, then `bash .claude/vendor/kit/bin/kit check --published`, which also fails while the kit pin is unpublished. The result of a fast-forward *is* the branch tip, so this checks the merged result. Any failure: **not clean**; go to Report.
 5. **Land.** `git switch main`, then `git merge --ff-only B`. The guard hook allows exactly this form on `main`. Leave HEAD on `main`: a new session then starts from `main`, and if this session keeps working, its next edit creates a fresh branch per the rule table.
 6. **Kit checkout.** `git submodule update --init .claude/vendor/kit` again, so the checkout matches the landed pin.
-7. **Report.** `git log --oneline ORIG_HEAD..main` lists what landed, and `git rev-list --count origin/main..main` counts what is unpushed. Say: branch, commit count, "fast-forward, gate passed", that `main` is now N ahead of `origin/main`, and what a push of it does, as repo.md § Deploy states (push only on request). The branch stays; never delete it.
+7. **Report.** `git log --oneline ORIG_HEAD..main` lists what landed, and `git rev-list --count origin/main..main` counts what is unpushed. Say: branch, commit count, "fast-forward, gate passed" (when kit check printed a NOTICE that the gate is kit check, quote that NOTICE in place of "gate passed"), that `main` is now N ahead of `origin/main`, and what a push of it does, as repo.md § Deploy states (push only on request). The branch stays; never delete it.
 
 ## Report when not clean
 

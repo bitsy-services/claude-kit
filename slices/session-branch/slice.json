@@ -1,7 +1,7 @@
 {
   "requires": ["core"],
   "params": {
-    "trunk": {"default": "main", "pattern": "^[A-Za-z0-9._/-]+$"},
+    "trunk": {"default": "main", "pattern": "^[A-Za-z0-9._/-]+$", "init": "default_branch"},
     "remote": {"default": "origin", "pattern": "^[A-Za-z0-9._/-]+$"}
   },
   "headings": ["Deploy", "Gate", "Conflict stops", "Branch names"],

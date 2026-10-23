@@ -4,9 +4,9 @@ These rules govern changes to the kit itself, made in the kit's own clone. They 
 
 ## What the kit is
 
-A public repo of shared Claude Code configuration. A repo that uses it vendors it as a git submodule at `.claude/vendor/kit`, names slices and parameters in `.claude/kit.json`, and runs `bin/kit render`. Render writes the slices' rules, skills and hooks into that repo's `.claude/` as stamped, committed copies, merges their settings fragments into its `.claude/settings.json` and records the result in `.claude/kit.lock.json`. `kit check` fails on any difference from the pinned commit. Claude Code reads only the rendered copies, never the submodule.
+A public repo of shared Claude Code configuration. A repo that uses it vendors it as a git submodule at `.claude/vendor/kit`, names slices and parameters in `.claude/kit.json` (which `bin/kit init` writes from what the repo has), and runs `bin/kit apply`, which creates the repo's own missing files, renders and checks. Render writes the slices' rules, skills and hooks into that repo's `.claude/` as stamped, committed copies, merges their settings fragments into its `.claude/settings.json` and records the result in `.claude/kit.lock.json`. `kit check` fails on any difference from the pinned commit. Claude Code reads only the rendered copies, never the submodule.
 
-- `slices/<slice>/` is the payload: `slice.json` (requires, conflicts, params, headings, set, forbid), `settings.json` (permissions and hooks only), `rules/`, `skills/` and `hooks/`.
+- `slices/<slice>/` is the payload: `slice.json` (requires, conflicts, detect, params with an optional `init` detector, headings, set, forbid), `settings.json` (permissions and hooks only), `repo.md` (default text for the slice's headings), `rules/`, `skills/` and `hooks/`.
 - `bin/kit` and `lib/` are the CLI.
 - `test/` holds the suite, the toy kit and the fixtures, whose `expected/` trees are each fixture repo's whole rendered result.
 

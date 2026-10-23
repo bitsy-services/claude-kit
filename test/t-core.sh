@@ -54,6 +54,15 @@ t_core_render_allowed_exactly() {
     "allow: no kit render entry takes arguments, so --discard prompts"
 }
 
+# kit apply is allowed bare as well, so apply --discard prompts.
+t_core_apply_allowed_exactly() {
+  local s="$CON/.claude/settings.json"
+  is "$(jq '.permissions.allow | index("Bash(bash .claude/vendor/kit/bin/kit apply)") != null' "$s")" true \
+    "allow: kit apply is allowed"
+  is "$(jq '[.permissions.allow[] | select(startswith("Bash(bash .claude/vendor/kit/bin/kit apply "))] | length' "$s")" 0 \
+    "allow: no kit apply entry takes arguments, so --discard prompts"
+}
+
 # M3: core sets disableAllHooks false, so a tracked true fails the SET row.
 t_core_set_hooks() {
   local s="$CON/.claude/settings.json"
@@ -145,6 +154,7 @@ t_core_rules
 t_core_gate_allowed_once
 t_core_kit_edit_allowed
 t_core_render_allowed_exactly
+t_core_apply_allowed_exactly
 t_core_texts
 t_core_check
 t_core_set_hooks
